@@ -14,7 +14,9 @@ const possiblePaths = [
 const caCertPath = possiblePaths.find(p => fs.existsSync(p));
 const caCert = caCertPath ? fs.readFileSync(caCertPath, 'utf-8') : undefined;
 
-if (caCert) {
+if (caCert && caCertPath) {
+  // Установить NODE_EXTRA_CA_CERTS для Node.js TLS (pg использует его)
+  process.env.NODE_EXTRA_CA_CERTS = caCertPath;
   console.log(`DB SSL: CA.pem loaded from ${caCertPath}`);
 } else {
   console.log('DB SSL: CA.pem not found, using rejectUnauthorized=false');

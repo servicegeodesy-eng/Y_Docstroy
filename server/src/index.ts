@@ -1,3 +1,14 @@
+import path from 'path';
+import fs from 'fs';
+
+// Yandex CA cert — должен быть загружен ДО любых pg-подключений
+const caPath = [
+  path.join(__dirname, '../certs/CA.pem'),
+  path.join(process.cwd(), 'certs/CA.pem'),
+  path.join(process.cwd(), 'server/certs/CA.pem'),
+].find(p => fs.existsSync(p));
+if (caPath) process.env.NODE_EXTRA_CA_CERTS = caPath;
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
