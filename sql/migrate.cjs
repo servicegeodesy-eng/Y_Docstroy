@@ -120,7 +120,12 @@ async function migrateTable(tableName) {
 
   let inserted = 0;
   for (const row of rows) {
-    const values = columns.map(c => row[c]);
+    const values = columns.map(c => {
+      const v = row[c];
+      // Сериализовать объекты/массивы в JSON строку (для jsonb полей)
+      if (v !== null && typeof v === 'object') return JSON.stringify(v);
+      return v;
+    });
     const placeholders = columns.map((_, i) => `$${i + 1}`).join(', ');
     try {
       await yandex.query(
