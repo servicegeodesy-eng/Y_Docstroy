@@ -45,6 +45,7 @@ class QueryBuilder<T = unknown> implements PromiseLike<QueryResult<T>> {
   private isMaybeSingle = false;
   private bodyData: unknown = null;
   private countOption: string | null = null;
+  private headOnly = false;
 
   constructor(table: string) {
     this.table = table;
@@ -52,10 +53,11 @@ class QueryBuilder<T = unknown> implements PromiseLike<QueryResult<T>> {
 
   // ---- Query methods (return this for chaining) ----
 
-  select(columns: string = '*', options?: { count?: string }): this {
+  select(columns: string = '*', options?: { count?: string; head?: boolean }): this {
     this.method = 'GET';
     this.selectColumns = columns;
     if (options?.count) this.countOption = options.count;
+    if (options?.head) this.headOnly = true;
     return this;
   }
 
@@ -248,6 +250,10 @@ class QueryBuilder<T = unknown> implements PromiseLike<QueryResult<T>> {
       params['count'] = this.countOption;
     }
 
+    if (this.headOnly) {
+      params['head'] = 'true';
+    }
+
     return params;
   }
 
@@ -260,6 +266,7 @@ class QueryBuilder<T = unknown> implements PromiseLike<QueryResult<T>> {
     // Map table names to API paths
     const tableMap: Record<string, string> = {
       // Main tables
+      profiles: '/api/query/users',  // Legacy alias: profiles → users
       users: '/api/users',
       projects: '/api/projects',
       cells: '/api/cells',

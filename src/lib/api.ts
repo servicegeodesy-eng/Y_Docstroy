@@ -327,11 +327,12 @@ export const auth = {
 export const storage = {
   from(bucket: string) {
     return {
-      async upload(path: string, file: File | Blob) {
+      async upload(path: string, file: File | Blob, options?: { upsert?: boolean }) {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('bucket', bucket);
         formData.append('path', path);
+        if (options?.upsert) formData.append('upsert', 'true');
         return api.upload<{ storage_path: string }>('/api/files/upload', formData);
       },
 
