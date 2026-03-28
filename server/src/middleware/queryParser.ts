@@ -1,69 +1,27 @@
 /**
- * queryParser.ts — парсер PostgREST-совместимых query-параметров.
- * Фронтенд-адаптер supabase.ts отправляет фильтры в формате:
- *   ?column=op.value  (eq, neq, gt, gte, lt, lte, like, ilike, is, in, cs, not.eq)
- *   ?select=col1,col2,dict_buildings(name),creator:users!created_by(last_name,first_name)
- *   ?order=created_at.desc,name.asc
- *   ?limit=100&offset=0
+ * queryParser.ts — парсер PostgREST-совместимых query-параметров (v2).
+ *
+ * Фронтенд-адаптер supabase.ts отправляет:
+ *   ?column=op.value      — фильтры
+ *   ?select=col,table(c)  — колонки + JOIN-ы
+ *   ?order=col.desc       — сортировка
+ *   ?limit=N&offset=N     — пагинация
  */
 
 import { Request } from 'express';
 
 // ============================================================================
-// Types
+// FK metadata
 // ============================================================================
 
-interface ParsedFilter {
-  column: string;
-  op: string;
-  value: unknown;
-  paramIndex: number;
-}
-
-interface ParsedJoin {
-  alias: string;
-  table: string;
-  fkColumn: string;  // FK on main table pointing to joined table
-  columns: string[];
-  isInner: boolean;
-}
-
-interface ParsedOrder {
-  column: string;
-  direction: 'ASC' | 'DESC';
-}
-
-export interface ParsedQuery {
-  selectColumns: string[];     // columns from main table
-  joins: ParsedJoin[];
-  filters: ParsedFilter[];
-  orFilter: string | null;
-  orders: ParsedOrder[];
-  limit: number | null;
-  offset: number | null;
-  countOnly: boolean;          // head=true mode
-  countOption: string | null;  // "exact" etc.
-}
-
-// ============================================================================
-// Table metadata: FK relationships for JOIN resolution
-// ============================================================================
-
-/** Map: table_name → { fk_column_on_parent → referenced_table } */
+/** Forward FK: main_table.column → referenced_table.id */
 const FK_MAP: Record<string, Record<string, string>> = {
   cells: {
-    building_id: 'dict_buildings',
-    floor_id: 'dict_floors',
-    work_type_id: 'dict_work_types',
-    construction_id: 'dict_constructions',
-    set_id: 'dict_sets',
-    work_id: 'dict_works',
-    work_stage_id: 'dict_work_stages',
-    project_id: 'projects',
-    created_by: 'users',
-    assigned_to: 'users',
-    assigned_by: 'users',
-    original_sender_id: 'users',
+    building_id: 'dict_buildings', floor_id: 'dict_floors',
+    work_type_id: 'dict_work_types', construction_id: 'dict_constructions',
+    set_id: 'dict_sets', work_id: 'dict_works', work_stage_id: 'dict_work_stages',
+    project_id: 'projects', created_by: 'users', assigned_to: 'users',
+    assigned_by: 'users', original_sender_id: 'users',
   },
   cell_files: { cell_id: 'cells', uploaded_by: 'users' },
   cell_file_versions: { file_id: 'cell_files', uploaded_by: 'users' },
@@ -117,8 +75,22 @@ const FK_MAP: Record<string, Record<string, string>> = {
   refresh_tokens: { user_id: 'users' },
 };
 
-/** Reverse lookup: given a target table, find FK columns that reference it */
-function findFkColumn(mainTable: string, targetTable: string): string | null {
+/** Reverse FK: parent_table → { child_table: fk_column_on_child } */
+const REVERSE_FK: Record<string, Record<string, string>> = {
+  cells: {
+    cell_files: 'cell_id', cell_comments: 'cell_id', cell_public_comments: 'cell_id',
+    cell_signatures: 'cell_id', cell_shares: 'cell_id', cell_history: 'cell_id',
+    cell_archives: 'cell_id', cell_overlay_masks: 'cell_id',
+  },
+  file_shares: {
+    file_share_recipients: 'share_id', file_share_files: 'share_id',
+    file_share_overlay_masks: 'share_id',
+  },
+  gro_cells: { gro_cell_files: 'gro_cell_id' },
+  project_statuses: { status_role_assignments: 'status_id' },
+};
+
+function findForwardFk(mainTable: string, targetTable: string): string | null {
   const fks = FK_MAP[mainTable];
   if (!fks) return null;
   for (const [col, tbl] of Object.entries(fks)) {
@@ -127,27 +99,16 @@ function findFkColumn(mainTable: string, targetTable: string): string | null {
   return null;
 }
 
-/** Tables that have a reverse FK (child → parent via cell_id etc.) */
-const REVERSE_FK: Record<string, Record<string, string>> = {
-  cells: {
-    cell_files: 'cell_id',
-    cell_comments: 'cell_id',
-    cell_public_comments: 'cell_id',
-    cell_signatures: 'cell_id',
-    cell_shares: 'cell_id',
-    cell_history: 'cell_id',
-    cell_archives: 'cell_id',
-    cell_overlay_masks: 'cell_id',
-  },
-  file_shares: {
-    file_share_recipients: 'share_id',
-    file_share_files: 'share_id',
-    file_share_overlay_masks: 'share_id',
-  },
-};
+function findReverseFk(mainTable: string, childTable: string): string | null {
+  return REVERSE_FK[mainTable]?.[childTable] || null;
+}
+
+export function resolveTableName(name: string): string {
+  return name === 'profiles' ? 'users' : name;
+}
 
 // ============================================================================
-// Allowed tables (whitelist)
+// Allowed tables
 // ============================================================================
 
 const ALLOWED_TABLES = new Set([
@@ -175,96 +136,16 @@ export function isAllowedTable(table: string): boolean {
   return ALLOWED_TABLES.has(table);
 }
 
-// Table aliases (frontend uses old names)
-export function resolveTableName(name: string): string {
-  if (name === 'profiles') return 'users';
-  return name;
-}
-
 // ============================================================================
-// Select parser
+// Tokenizer — splits on comma respecting nested parentheses
 // ============================================================================
 
-/**
- * Parse Supabase-style select string:
- *   "*" → all columns
- *   "id, name, dict_buildings(name)" → columns + JOINs
- *   "creator:profiles!created_by(last_name, first_name)" → aliased JOIN via FK
- *   "cells!inner(name, status)" → INNER JOIN (reverse FK)
- */
-function parseSelect(selectStr: string, mainTable: string): { columns: string[]; joins: ParsedJoin[] } {
-  const columns: string[] = [];
-  const joins: ParsedJoin[] = [];
-
-  if (!selectStr || selectStr === '*') {
-    columns.push('*');
-    return { columns, joins };
-  }
-
-  // Tokenize respecting parentheses
-  const tokens = tokenizeSelect(selectStr);
-
-  for (const token of tokens) {
-    const trimmed = token.trim();
-    if (!trimmed) continue;
-
-    // Match: alias:table!fk_column(columns) or table!inner(columns) or table(columns)
-    const joinMatch = trimmed.match(
-      /^(?:(\w+):)?(\w+)(?:!(\w+))?\(([^)]*)\)$/
-    );
-
-    if (joinMatch) {
-      const [, alias, rawTable, modifier, innerCols] = joinMatch;
-      const table = resolveTableName(rawTable);
-      const isInner = modifier === 'inner';
-      const fkColumn = (!isInner && modifier) ? modifier : '';
-      const joinAlias = alias || rawTable;
-      const cols = innerCols.split(',').map((c) => c.trim()).filter(Boolean);
-
-      // Determine FK column
-      let resolvedFk = fkColumn;
-      if (!resolvedFk) {
-        // Try forward FK: main_table.X_id → joined_table
-        const fwd = findFkColumn(mainTable, table);
-        if (fwd) {
-          resolvedFk = fwd;
-        } else {
-          // Try reverse FK: joined_table.main_table_id → main_table
-          const revMap = REVERSE_FK[mainTable];
-          if (revMap && revMap[table]) {
-            resolvedFk = `__reverse__:${revMap[table]}`;
-          }
-        }
-      }
-
-      joins.push({
-        alias: joinAlias,
-        table,
-        fkColumn: resolvedFk,
-        columns: cols.length > 0 ? cols : ['*'],
-        isInner,
-      });
-    } else {
-      // Regular column
-      columns.push(trimmed);
-    }
-  }
-
-  if (columns.length === 0 && joins.length > 0) {
-    columns.push('*');
-  }
-
-  return { columns, joins };
-}
-
-/** Tokenize select string, respecting parentheses */
-function tokenizeSelect(s: string): string[] {
+function tokenize(s: string): string[] {
   const tokens: string[] = [];
   let depth = 0;
   let current = '';
-
   for (const ch of s) {
-    if (ch === '(' ) { depth++; current += ch; }
+    if (ch === '(') { depth++; current += ch; }
     else if (ch === ')') { depth--; current += ch; }
     else if (ch === ',' && depth === 0) {
       tokens.push(current.trim());
@@ -278,111 +159,93 @@ function tokenizeSelect(s: string): string[] {
 }
 
 // ============================================================================
-// Filter parser
+// SELECT parser
 // ============================================================================
 
-const SKIP_PARAMS = new Set(['select', 'order', 'limit', 'offset', 'count', 'head', '_table', 'or']);
+interface JoinSpec {
+  alias: string;       // alias or table name
+  table: string;       // resolved table name
+  fkColumn: string;    // FK column on parent (or '' for reverse)
+  isReverse: boolean;  // true = child→parent (json_agg), false = parent→child (row_to_json)
+  isInner: boolean;    // !inner modifier
+  columns: string[];   // columns to select (may include nested join specs as raw strings)
+}
 
-function parseFilters(query: Record<string, string>): { filters: ParsedFilter[]; orFilter: string | null } {
-  const filters: ParsedFilter[] = [];
-  let paramIdx = 1;
-  let orFilter: string | null = null;
+function parseSelectString(selectStr: string, mainTable: string): { columns: string[]; joins: JoinSpec[] } {
+  const columns: string[] = [];
+  const joins: JoinSpec[] = [];
 
-  for (const [key, rawValue] of Object.entries(query)) {
-    if (SKIP_PARAMS.has(key)) continue;
+  if (!selectStr || selectStr.trim() === '*') {
+    return { columns: ['*'], joins: [] };
+  }
 
-    if (key === 'or') {
-      orFilter = rawValue;
-      continue;
-    }
+  const tokens = tokenize(selectStr);
 
-    const value = rawValue as string;
+  for (const token of tokens) {
+    // Match: [alias:]table[!modifier](inner_content)
+    const m = token.match(/^(?:(\w+):)?(\w+)(?:!(\w+))?\((.+)\)$/s);
+    if (m) {
+      const [, alias, rawTable, modifier, innerContent] = m;
+      const table = resolveTableName(rawTable);
+      const isInner = modifier === 'inner';
+      const explicitFk = (!isInner && modifier) ? modifier : '';
+      const joinAlias = alias || rawTable;
 
-    // Parse operator.value format
-    const dotIdx = value.indexOf('.');
-    if (dotIdx === -1) {
-      // No operator — treat as eq
-      filters.push({ column: key, op: 'eq', value, paramIndex: paramIdx++ });
-      continue;
-    }
-
-    let op = value.substring(0, dotIdx);
-    let val: unknown = value.substring(dotIdx + 1);
-
-    // Handle "not.op" prefix
-    let negate = false;
-    if (op === 'not') {
-      negate = true;
-      const rest = val as string;
-      const nextDot = rest.indexOf('.');
-      if (nextDot !== -1) {
-        op = rest.substring(0, nextDot);
-        val = rest.substring(nextDot + 1);
+      // Extract only simple columns (strip nested joins)
+      const innerTokens = tokenize(innerContent);
+      const simpleCols: string[] = [];
+      for (const it of innerTokens) {
+        if (it.includes('(')) {
+          // Nested join — skip for now (too complex for SQL subquery)
+          continue;
+        }
+        simpleCols.push(it.trim());
       }
-    }
 
-    // Parse specific operators
-    switch (op) {
-      case 'eq':
-      case 'neq':
-      case 'gt':
-      case 'gte':
-      case 'lt':
-      case 'lte':
-      case 'like':
-      case 'ilike':
-        filters.push({ column: key, op: negate ? `not_${op}` : op, value: val, paramIndex: paramIdx++ });
-        break;
-      case 'is':
-        filters.push({ column: key, op: negate ? 'is_not' : 'is', value: val === 'null' ? null : val, paramIndex: paramIdx++ });
-        break;
-      case 'in':
-        // in.(val1,val2,val3)
-        const inStr = (val as string).replace(/^\(/, '').replace(/\)$/, '');
-        const inValues = inStr.split(',').map((v) => v.trim());
-        filters.push({ column: key, op: negate ? 'not_in' : 'in', value: inValues, paramIndex: paramIdx++ });
-        break;
-      case 'cs':
-        filters.push({ column: key, op: 'contains', value: val, paramIndex: paramIdx++ });
-        break;
-      default:
-        // Unknown op, treat as eq
-        filters.push({ column: key, op: 'eq', value: rawValue, paramIndex: paramIdx++ });
+      // Determine FK
+      let fkColumn = explicitFk;
+      let isReverse = false;
+
+      if (!fkColumn) {
+        const fwd = findForwardFk(mainTable, table);
+        if (fwd) {
+          fkColumn = fwd;
+        } else {
+          const rev = findReverseFk(mainTable, table);
+          if (rev) {
+            fkColumn = rev;
+            isReverse = true;
+          }
+        }
+      } else {
+        // Explicit FK given — check if it's forward (main.fk → joined.id)
+        const fks = FK_MAP[mainTable];
+        if (fks && fks[fkColumn] === table) {
+          isReverse = false;
+        } else {
+          // Could be reverse with explicit FK name
+          isReverse = false;
+        }
+      }
+
+      joins.push({
+        alias: joinAlias,
+        table,
+        fkColumn,
+        isReverse,
+        isInner,
+        columns: simpleCols.length > 0 ? simpleCols : ['*'],
+      });
+    } else {
+      columns.push(token.trim());
     }
   }
 
-  return { filters, orFilter };
-}
+  if (columns.length === 0 && joins.length > 0) {
+    columns.push('*');
+  }
 
-// ============================================================================
-// Order parser
-// ============================================================================
-
-function parseOrder(orderStr: string | undefined): ParsedOrder[] {
-  if (!orderStr) return [];
-  return orderStr.split(',').map((part) => {
-    const [column, dir] = part.trim().split('.');
-    return { column, direction: dir === 'desc' ? 'DESC' as const : 'ASC' as const };
-  });
-}
-
-// ============================================================================
-// Main parser
-// ============================================================================
-
-export function parseQuery(req: Request, mainTable: string): ParsedQuery {
-  const q = req.query as Record<string, string>;
-
-  const selectStr = q.select || '*';
-  const { columns, joins } = parseSelect(selectStr, mainTable);
-  const { filters, orFilter } = parseFilters(q);
-  const orders = parseOrder(q.order);
-  const limit = q.limit ? parseInt(q.limit, 10) : null;
-  const offset = q.offset ? parseInt(q.offset, 10) : null;
-  const countOnly = q.head === 'true';
-  const countOption = q.count || null;
-
-  return { selectColumns: columns, joins, filters, orFilter, orders, limit, offset, countOnly, countOption };
+  return { columns, joins };
 }
 
 // ============================================================================
@@ -392,152 +255,164 @@ export function parseQuery(req: Request, mainTable: string): ParsedQuery {
 export interface BuiltQuery {
   text: string;
   values: unknown[];
-  countText?: string; // Optional count query
 }
 
-export function buildSelectSQL(table: string, parsed: ParsedQuery): BuiltQuery {
+export function buildSelectSQL(table: string, req: Request): BuiltQuery {
+  const q = req.query as Record<string, string>;
   const values: unknown[] = [];
   let paramIdx = 1;
 
-  // --- SELECT columns ---
-  const selectParts: string[] = [];
+  // --- Parse select ---
+  const selectStr = (q.select || '*').replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+  const { columns, joins } = parseSelectString(selectStr, table);
 
-  if (parsed.countOnly) {
+  // --- Build SELECT columns ---
+  const selectParts: string[] = [];
+  const isCountOnly = q.head === 'true';
+
+  if (isCountOnly) {
     selectParts.push('COUNT(*)::int AS count');
   } else {
     // Main table columns
-    if (parsed.selectColumns.includes('*')) {
-      selectParts.push(`"${table}".*`);
+    if (columns.includes('*')) {
+      selectParts.push(`t.*`);
     } else {
-      for (const col of parsed.selectColumns) {
-        selectParts.push(`"${table}"."${col}"`);
+      for (const col of columns) {
+        selectParts.push(`t."${col}"`);
       }
     }
 
-    // Join columns as JSON aggregates or row sub-selects
-    for (const join of parsed.joins) {
-      const isReverse = join.fkColumn.startsWith('__reverse__:');
+    // Join subqueries
+    for (const join of joins) {
+      if (join.isReverse) {
+        // Reverse FK: child table → aggregate as JSON array
+        const cols = join.columns.includes('*') ? '*'
+          : join.columns.map(c => `"${c}"`).join(', ');
 
-      if (isReverse) {
-        // Reverse FK → aggregate as JSON array via lateral subquery
-        const revFk = join.fkColumn.replace('__reverse__:', '');
-        const subCols = join.columns.includes('*')
-          ? `"${join.table}".*`
-          : join.columns.map((c) => `"${join.table}"."${c}"`).join(', ');
-
-        // Use count check — Supabase returns [{count: N}] for (count) selects
         if (join.columns.length === 1 && join.columns[0] === 'count') {
           selectParts.push(
-            `(SELECT COUNT(*)::int FROM "${join.table}" WHERE "${join.table}"."${revFk}" = "${table}"."id") AS "${join.alias}_count"`
+            `(SELECT COUNT(*)::int FROM "${join.table}" WHERE "${join.table}"."${join.fkColumn}" = t."id") AS "${join.alias}"`
           );
         } else {
           selectParts.push(
-            `COALESCE((SELECT json_agg(sub) FROM (SELECT ${subCols} FROM "${join.table}" WHERE "${join.table}"."${revFk}" = "${table}"."id") sub), '[]'::json) AS "${join.alias}"`
+            `COALESCE((SELECT json_agg(sub) FROM (SELECT ${cols} FROM "${join.table}" WHERE "${join.table}"."${join.fkColumn}" = t."id") sub), '[]'::json) AS "${join.alias}"`
           );
         }
       } else {
-        // Forward FK → single row, select as JSON object
-        const fk = join.fkColumn || findFkColumn(table, join.table) || `${join.table}_id`;
-        const joinCols = join.columns.includes('*')
-          ? `"${join.alias}".*`
-          : join.columns.map((c) => `"${join.alias}"."${c}"`).join(', ');
+        // Forward FK: parent → single row as JSON object
+        const fk = join.fkColumn || `${join.table}_id`;
+        const cols = join.columns.includes('*') ? '*'
+          : join.columns.map(c => `"${c}"`).join(', ');
 
         selectParts.push(
-          `(SELECT row_to_json(sub) FROM (SELECT ${joinCols} FROM "${join.table}" AS "${join.alias}_sub" WHERE "${join.alias}_sub"."id" = "${table}"."${fk}" LIMIT 1) sub) AS "${join.alias}"`
+          `(SELECT row_to_json(sub) FROM (SELECT ${cols} FROM "${join.table}" WHERE "id" = t."${fk}" LIMIT 1) sub) AS "${join.alias}"`
         );
       }
     }
   }
 
-  // --- FROM ---
-  let sql = `SELECT ${selectParts.join(', ')} FROM "${table}"`;
+  let sql = `SELECT ${selectParts.join(', ')} FROM "${table}" t`;
 
   // --- WHERE ---
   const whereParts: string[] = [];
+  const skipParams = new Set(['select', 'order', 'limit', 'offset', 'count', 'head', '_table', 'or']);
 
-  for (const f of parsed.filters) {
-    // Handle filters on joined tables (e.g., cells.project_id from inner join context)
-    const colRef = `"${table}"."${f.column}"`;
+  for (const [key, rawValue] of Object.entries(q)) {
+    if (skipParams.has(key)) continue;
 
-    switch (f.op) {
+    // Skip dot-notation filters on joined tables (e.g. cells.project_id)
+    if (key.includes('.')) continue;
+
+    const value = rawValue as string;
+    const dotIdx = value.indexOf('.');
+    if (dotIdx === -1) {
+      // No operator — treat as eq
+      whereParts.push(`t."${key}" = $${paramIdx}`);
+      values.push(value);
+      paramIdx++;
+      continue;
+    }
+
+    let op = value.substring(0, dotIdx);
+    let val: unknown = value.substring(dotIdx + 1);
+
+    // Handle not.op
+    let negate = false;
+    if (op === 'not') {
+      negate = true;
+      const rest = val as string;
+      const nd = rest.indexOf('.');
+      if (nd !== -1) {
+        op = rest.substring(0, nd);
+        val = rest.substring(nd + 1);
+      }
+    }
+
+    const col = `t."${key}"`;
+
+    switch (op) {
       case 'eq':
-        whereParts.push(`${colRef} = $${paramIdx}`);
-        values.push(f.value);
-        paramIdx++;
+        whereParts.push(`${col} ${negate ? '!=' : '='} $${paramIdx}`);
+        values.push(val); paramIdx++;
         break;
       case 'neq':
-      case 'not_eq':
-        whereParts.push(`${colRef} != $${paramIdx}`);
-        values.push(f.value);
-        paramIdx++;
+        whereParts.push(`${col} != $${paramIdx}`);
+        values.push(val); paramIdx++;
         break;
       case 'gt':
-        whereParts.push(`${colRef} > $${paramIdx}`);
-        values.push(f.value);
-        paramIdx++;
+        whereParts.push(`${col} > $${paramIdx}`);
+        values.push(val); paramIdx++;
         break;
       case 'gte':
-        whereParts.push(`${colRef} >= $${paramIdx}`);
-        values.push(f.value);
-        paramIdx++;
+        whereParts.push(`${col} >= $${paramIdx}`);
+        values.push(val); paramIdx++;
         break;
       case 'lt':
-        whereParts.push(`${colRef} < $${paramIdx}`);
-        values.push(f.value);
-        paramIdx++;
+        whereParts.push(`${col} < $${paramIdx}`);
+        values.push(val); paramIdx++;
         break;
       case 'lte':
-        whereParts.push(`${colRef} <= $${paramIdx}`);
-        values.push(f.value);
-        paramIdx++;
+        whereParts.push(`${col} <= $${paramIdx}`);
+        values.push(val); paramIdx++;
         break;
       case 'like':
-        whereParts.push(`${colRef} LIKE $${paramIdx}`);
-        values.push(f.value);
-        paramIdx++;
+        whereParts.push(`${col} LIKE $${paramIdx}`);
+        values.push(val); paramIdx++;
         break;
       case 'ilike':
-        whereParts.push(`${colRef} ILIKE $${paramIdx}`);
-        values.push(f.value);
-        paramIdx++;
+        whereParts.push(`${col} ILIKE $${paramIdx}`);
+        values.push(val); paramIdx++;
         break;
       case 'is':
-        if (f.value === null || f.value === 'null') {
-          whereParts.push(`${colRef} IS NULL`);
-        } else if (f.value === 'true') {
-          whereParts.push(`${colRef} IS TRUE`);
-        } else if (f.value === 'false') {
-          whereParts.push(`${colRef} IS FALSE`);
-        }
+        if (val === 'null') whereParts.push(`${col} IS ${negate ? 'NOT ' : ''}NULL`);
+        else if (val === 'true') whereParts.push(`${col} IS ${negate ? 'NOT ' : ''}TRUE`);
+        else if (val === 'false') whereParts.push(`${col} IS ${negate ? 'NOT ' : ''}FALSE`);
         break;
-      case 'is_not':
-        if (f.value === null || f.value === 'null') {
-          whereParts.push(`${colRef} IS NOT NULL`);
-        }
-        break;
-      case 'in':
-      case 'not_in': {
-        const arr = f.value as string[];
-        const placeholders = arr.map(() => `$${paramIdx++}`);
-        const inClause = `${colRef} ${f.op === 'not_in' ? 'NOT ' : ''}IN (${placeholders.join(', ')})`;
-        whereParts.push(inClause);
+      case 'in': {
+        const inStr = (val as string).replace(/^\(/, '').replace(/\)$/, '');
+        const arr = inStr.split(',').map(v => v.trim());
+        const phs = arr.map(() => `$${paramIdx++}`);
+        whereParts.push(`${col} ${negate ? 'NOT ' : ''}IN (${phs.join(', ')})`);
         values.push(...arr);
         break;
       }
-      case 'contains':
-        whereParts.push(`${colRef} @> $${paramIdx}::jsonb`);
-        values.push(typeof f.value === 'string' ? f.value : JSON.stringify(f.value));
+      case 'cs':
+        whereParts.push(`${col} @> $${paramIdx}::jsonb`);
+        values.push(typeof val === 'string' ? val : JSON.stringify(val));
         paramIdx++;
+        break;
+      default:
+        // Unknown op — skip
         break;
     }
   }
 
-  // OR filter (PostgREST format: (col.op.val,col.op.val))
-  if (parsed.orFilter) {
-    const orParsed = parseOrFilter(parsed.orFilter, table, values, paramIdx);
+  // OR filter
+  if (q.or) {
+    const orParsed = parseOrFilter(q.or, values, paramIdx);
     if (orParsed.clause) {
       whereParts.push(orParsed.clause);
-      paramIdx = orParsed.nextParamIdx;
+      paramIdx = orParsed.nextIdx;
     }
   }
 
@@ -546,21 +421,24 @@ export function buildSelectSQL(table: string, parsed: ParsedQuery): BuiltQuery {
   }
 
   // --- ORDER ---
-  if (!parsed.countOnly && parsed.orders.length > 0) {
-    const orderClauses = parsed.orders.map((o) => `"${table}"."${o.column}" ${o.direction}`);
-    sql += ` ORDER BY ${orderClauses.join(', ')}`;
+  if (!isCountOnly && q.order) {
+    const orders = q.order.split(',').map(part => {
+      const [col, dir] = part.trim().split('.');
+      return `t."${col}" ${dir === 'desc' ? 'DESC' : 'ASC'}`;
+    });
+    sql += ` ORDER BY ${orders.join(', ')}`;
   }
 
   // --- LIMIT / OFFSET ---
-  if (!parsed.countOnly) {
-    if (parsed.limit !== null) {
+  if (!isCountOnly) {
+    if (q.limit) {
       sql += ` LIMIT $${paramIdx}`;
-      values.push(parsed.limit);
+      values.push(parseInt(q.limit, 10));
       paramIdx++;
     }
-    if (parsed.offset !== null && parsed.offset > 0) {
+    if (q.offset && parseInt(q.offset, 10) > 0) {
       sql += ` OFFSET $${paramIdx}`;
-      values.push(parsed.offset);
+      values.push(parseInt(q.offset, 10));
       paramIdx++;
     }
   }
@@ -572,13 +450,7 @@ export function buildSelectSQL(table: string, parsed: ParsedQuery): BuiltQuery {
 // OR filter parser
 // ============================================================================
 
-function parseOrFilter(
-  orStr: string,
-  table: string,
-  values: unknown[],
-  startIdx: number,
-): { clause: string | null; nextParamIdx: number } {
-  // Format: (col1.op.val,col2.op.val)
+function parseOrFilter(orStr: string, values: unknown[], startIdx: number): { clause: string | null; nextIdx: number } {
   const inner = orStr.replace(/^\(/, '').replace(/\)$/, '');
   const parts = inner.split(',');
   const orParts: string[] = [];
@@ -586,85 +458,59 @@ function parseOrFilter(
 
   for (const part of parts) {
     const trimmed = part.trim();
-    // col.op.val
     const firstDot = trimmed.indexOf('.');
     if (firstDot === -1) continue;
-
     const col = trimmed.substring(0, firstDot);
     const rest = trimmed.substring(firstDot + 1);
     const secondDot = rest.indexOf('.');
     if (secondDot === -1) continue;
-
     const op = rest.substring(0, secondDot);
     const val = rest.substring(secondDot + 1);
 
-    const colRef = `"${table}"."${col}"`;
-
     switch (op) {
       case 'eq':
-        orParts.push(`${colRef} = $${idx}`);
-        values.push(val);
-        idx++;
+        orParts.push(`t."${col}" = $${idx}`);
+        values.push(val); idx++;
         break;
       case 'neq':
-        orParts.push(`${colRef} != $${idx}`);
-        values.push(val);
-        idx++;
+        orParts.push(`t."${col}" != $${idx}`);
+        values.push(val); idx++;
         break;
       case 'is':
-        if (val === 'null') orParts.push(`${colRef} IS NULL`);
-        else if (val === 'true') orParts.push(`${colRef} IS TRUE`);
+        if (val === 'null') orParts.push(`t."${col}" IS NULL`);
+        else if (val === 'true') orParts.push(`t."${col}" IS TRUE`);
         break;
       default:
-        orParts.push(`${colRef} ${op === 'gt' ? '>' : op === 'lt' ? '<' : '='} $${idx}`);
-        values.push(val);
-        idx++;
+        orParts.push(`t."${col}" = $${idx}`);
+        values.push(val); idx++;
     }
   }
 
-  if (orParts.length === 0) return { clause: null, nextParamIdx: idx };
-  return { clause: `(${orParts.join(' OR ')})`, nextParamIdx: idx };
+  if (orParts.length === 0) return { clause: null, nextIdx: idx };
+  return { clause: `(${orParts.join(' OR ')})`, nextIdx: idx };
 }
 
 // ============================================================================
-// Tables that require project access check
+// Project access helpers
 // ============================================================================
 
-const PROJECT_TABLES = new Set([
-  'cells', 'cell_files', 'cell_file_versions', 'cell_comments', 'cell_comment_files',
-  'cell_public_comments', 'cell_history', 'cell_shares', 'cell_signatures',
-  'cell_archives', 'cell_overlay_masks',
-  'project_statuses', 'status_role_assignments',
-  'user_permissions', 'cell_action_permissions',
+const DIRECT_PROJECT_TABLES = new Set([
+  'cells', 'project_statuses', 'user_permissions', 'cell_action_permissions',
   'dict_buildings', 'dict_floors', 'dict_constructions', 'dict_work_types',
   'dict_work_stages', 'dict_sets', 'dict_overlays', 'dict_works',
-  'dict_building_work_types', 'dict_work_stage_buildings', 'dict_work_stage_work_types',
-  'dict_work_type_constructions', 'dict_work_type_floors', 'dict_work_type_overlays',
-  'dict_work_type_sets', 'dict_overlay_buildings', 'dict_overlay_constructions',
-  'dict_overlay_floors', 'dict_overlay_works', 'dict_building_floors',
-  'dict_building_work_type_floors',
-  'dict_axis_grids', 'dict_axis_grid_axes', 'dict_overlay_axis_grids', 'overlay_axis_points',
-  'gro_cells', 'gro_cell_files', 'gro_cell_file_versions',
-  'support_messages', 'support_message_files', 'support_blocked_users', 'support_read_status',
-  'file_shares', 'file_share_recipients', 'file_share_files', 'file_share_overlay_masks',
+  'dict_axis_grids', 'overlay_axis_points',
+  'gro_cells', 'support_messages', 'support_blocked_users', 'support_read_status',
+  'file_shares', 'project_members', 'project_organizations',
 ]);
 
 export function requiresProjectAccess(table: string): boolean {
-  return PROJECT_TABLES.has(table);
+  return DIRECT_PROJECT_TABLES.has(table);
 }
 
-/** Get the project_id column name for a table (direct or via parent) */
-export function getProjectIdColumn(table: string): string | null {
-  // Tables with direct project_id
-  const directProjectTables = new Set([
-    'cells', 'project_statuses', 'user_permissions', 'cell_action_permissions',
-    'dict_buildings', 'dict_floors', 'dict_constructions', 'dict_work_types',
-    'dict_work_stages', 'dict_sets', 'dict_overlays', 'dict_works',
-    'dict_axis_grids', 'overlay_axis_points',
-    'gro_cells', 'support_messages', 'support_blocked_users', 'support_read_status',
-    'file_shares', 'project_members',
-  ]);
-
-  if (directProjectTables.has(table)) return 'project_id';
-  return null; // Sub-tables don't have direct project_id
+export function getProjectIdFromQuery(q: Record<string, string>): string | null {
+  const val = q.project_id;
+  if (!val) return null;
+  // Parse "eq.UUID" format
+  if (val.startsWith('eq.')) return val.substring(3);
+  return val;
 }
