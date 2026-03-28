@@ -9,7 +9,7 @@ const path = require('path');
 
 // === НАСТРОЙКИ ===
 const SUPABASE_URL = 'https://jbjnqjedqumzkxcfmeyo.supabase.co';
-const SUPABASE_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impiam5xamVkcXVtemt4Y2ZtZXlvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczODkyNjM3MCwiZXhwIjoyMDU0NTAyMzcwfQ.RDPOh84kJXecF1IjbZBvn0YMSh_2y2jEMJjBpg2HYXU';
+const SUPABASE_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impiam5xamVkcXVtemt4Y2ZtZXlvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjAzMTg3MCwiZXhwIjoyMDg3NjA3ODcwfQ.XPbBuoCTsXmkOlD6pD0SAA46aN1ShBhCOjgtgA8eYlc';
 // ↑ Возьми из Supabase Dashboard → Settings → API → service_role key
 // Если ключ неверный — замени на правильный
 
