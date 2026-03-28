@@ -12,12 +12,14 @@ const path = require('path');
 const caCertPath = path.join(__dirname, '..', 'server', 'certs', 'CA.pem');
 
 const supabase = new Pool({
-  host: 'aws-0-eu-central-1.pooler.supabase.com',
-  port: 6543,
+  host: 'db.jbjnqjedqumzkxcfmeyo.supabase.co',
+  port: 5432,
   database: 'postgres',
-  user: 'postgres.jbjnqjedqumzkxcfmeyo',
+  user: 'postgres',
   password: 'BntU@114338',
   ssl: { rejectUnauthorized: false },
+  // Принудительно IPv4 (Supabase блокирует IPv6)
+  family: 4,
 });
 
 const yandex = new Pool({
