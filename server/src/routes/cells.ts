@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import pool from '../config/db.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { hasProjectAccess } from '../middleware/permissions.js';
+import { notifyOnCellAction } from '../services/pushService.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -365,6 +366,9 @@ router.post('/:id/change-status', async (req: AuthRequest, res: Response) => {
       comment: comment || null,
     });
 
+    // Push notification (fire-and-forget)
+    notifyOnCellAction(cellId, 'status_changed', userId, { new_status: status });
+
     res.json({ ok: true });
   } catch (err) {
     console.error('Change status error:', err);
@@ -416,6 +420,10 @@ router.post('/:id/send', async (req: AuthRequest, res: Response) => {
       );
 
       await client.query('COMMIT');
+
+      // Push notification (fire-and-forget)
+      notifyOnCellAction(cellId, 'share', userId, { to_user_id, send_type });
+
       res.json({ ok: true });
     } catch (err) {
       await client.query('ROLLBACK');
@@ -459,6 +467,9 @@ router.post('/:id/sign', async (req: AuthRequest, res: Response) => {
     );
 
     await writeCellHistory(cellId, userId, 'signed', { status, comment });
+
+    // Push notification (fire-and-forget)
+    notifyOnCellAction(cellId, 'sign', userId, { status });
 
     res.json({ ok: true });
   } catch (err) {
@@ -529,6 +540,9 @@ router.post('/:id/comment', async (req: AuthRequest, res: Response) => {
     );
 
     await writeCellHistory(cellId, userId, 'commented');
+
+    // Push notification (fire-and-forget)
+    notifyOnCellAction(cellId, 'comment', userId, { text });
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
