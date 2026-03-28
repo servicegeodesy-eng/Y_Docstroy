@@ -19,6 +19,7 @@ import fileshareRoutes from './routes/fileshare.js';
 import notificationRoutes from './routes/notifications.js';
 import pushRoutes from './routes/push.js';
 import rpcRoutes from './routes/rpc.js';
+import genericRoutes from './routes/generic.js';
 
 dotenv.config();
 
@@ -51,6 +52,9 @@ app.use('/api/fileshare', fileshareRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/push', pushRoutes);
 app.use('/api/rpc', rpcRoutes);
+
+// Generic CRUD fallback (MUST be last — catches /api/query/:table)
+app.use('/api/query', genericRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {
