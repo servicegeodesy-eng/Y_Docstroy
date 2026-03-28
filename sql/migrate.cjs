@@ -15,10 +15,10 @@ dns.setDefaultResultOrder('ipv4first');
 // === НАСТРОЙКИ ===
 const caCertPath = path.join(__dirname, '..', 'server', 'certs', 'CA.pem');
 
-// Supabase Pooler (Transaction mode, порт 6543)
+// Supabase Shared Pooler (Session mode, порт 5432 — лучше для миграции)
 const supabase = new Pool({
   host: 'aws-1-ap-northeast-1.pooler.supabase.com',
-  port: 6543,
+  port: 5432,
   database: 'postgres',
   user: 'postgres.jbjnqjedqumzkxcfmeyo',
   password: '1QwertYqazxswEdCbnj',
@@ -161,17 +161,19 @@ async function main() {
   }
   console.log('\n⚙ Seed-триггеры отключены\n');
 
-  // === Шаг 1: users (из profiles, без auth.users — pooler не поддерживает auth схему) ===
-  // Пароли будут заданы как временные, пользователям нужно будет сбросить
+  // === Шаг 1: users (из profiles) ===
   console.log('--- Шаг 1: users ---');
-  const { rows: users } = await supabase.query(`
-    SELECT
-      id, email, last_name, first_name, middle_name,
-      structure, organization, position, phone,
-      is_portal_admin, is_global_reader, must_change_password,
-      created_at, updated_at
-    FROM public.profiles
-  `);
+  console.log('  Запрос к Supabase...');
+  const usersClient = await supabase.connect();
+  await usersClient.query('SET statement_timeout = 30000'); // 30 сек
+  let users;
+  try {
+    const res = await usersClient.query('SELECT id, email, last_name, first_name, middle_name, structure, organization, position, phone, is_portal_admin, is_global_reader, must_change_password, created_at, updated_at FROM public.profiles');
+    users = res.rows;
+    console.log(`  Получено ${users.length} пользователей`);
+  } finally {
+    usersClient.release();
+  }
 
   // Временный пароль — bcrypt hash для "changeme123"
   const TEMP_PASSWORD_HASH = '$2a$12$LJ3m4ys2Y8EElyBGOCHrTe5OwUjHVe/XPyGi/dGDlr0YphFOGmjWq';
