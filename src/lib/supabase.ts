@@ -263,90 +263,13 @@ class QueryBuilder<T = unknown> implements PromiseLike<QueryResult<T>> {
   }
 
   private getPath(): string {
-    // Map table names to API paths
-    const tableMap: Record<string, string> = {
-      // Main tables
-      profiles: '/api/query/users',  // Legacy alias: profiles → users
-      users: '/api/users',
-      projects: '/api/projects',
-      cells: '/api/cells',
-      project_members: '/api/users/project-member',
-      project_statuses: '/api/statuses',
-      status_role_assignments: '/api/statuses',
-      portal_role_permissions: '/api/permissions/portal-roles',
-      user_permissions: '/api/permissions/user',
-      cell_action_permissions: '/api/permissions/cell-actions',
-      notifications: '/api/notifications',
-      push_subscriptions: '/api/push/subscribe',
-      file_shares: '/api/fileshare',
-      file_share_recipients: '/api/fileshare',
-      file_share_files: '/api/fileshare',
-
-      // Dictionaries
-      dict_buildings: '/api/dictionaries/buildings',
-      dict_floors: '/api/dictionaries/floors',
-      dict_work_types: '/api/dictionaries/work_types',
-      dict_constructions: '/api/dictionaries/constructions',
-      dict_sets: '/api/dictionaries/sets',
-      dict_works: '/api/dictionaries/works',
-      dict_work_stages: '/api/dictionaries/work_stages',
-      dict_overlays: '/api/overlays',
-      dict_overlay_axis_grids: '/api/overlays',
-      dict_overlay_buildings: '/api/overlays',
-      dict_overlay_floors: '/api/overlays',
-      dict_overlay_constructions: '/api/overlays',
-      dict_axis_grids: '/api/dictionaries/axis_grids',
-      dict_axis_grid_axes: '/api/dictionaries/axis_grid_axes',
-      overlay_axis_points: '/api/overlays',
-
-      // Cell sub-tables
-      cell_files: '/api/files/cell',
-      cell_file_versions: '/api/files/cell',
-      cell_comments: '/api/cells',
-      cell_comment_files: '/api/cells',
-      cell_public_comments: '/api/cells',
-      cell_history: '/api/cells',
-      cell_shares: '/api/cells',
-      cell_signatures: '/api/cells',
-      cell_archives: '/api/cells',
-      cell_overlay_masks: '/api/cells',
-
-      // GRO
-      gro_cells: '/api/cells',
-      gro_cell_files: '/api/files/cell',
-
-      // Support
-      support_messages: '/api/support',
-      support_message_files: '/api/support',
-      support_blocked_users: '/api/support',
-      support_read_status: '/api/support',
-
-      // Junction tables
-      dict_building_work_types: '/api/dictionaries/building_work_types',
-      dict_work_stage_buildings: '/api/dictionaries/work_stage_buildings',
-      dict_work_stage_work_types: '/api/dictionaries/work_stage_work_types',
-      dict_work_type_constructions: '/api/dictionaries/work_type_constructions',
-      dict_work_type_floors: '/api/dictionaries/work_type_floors',
-      dict_work_type_overlays: '/api/dictionaries/work_type_overlays',
-      dict_work_type_sets: '/api/dictionaries/work_type_sets',
-      dict_overlay_works: '/api/dictionaries/overlay_works',
-      dict_building_floors: '/api/dictionaries/building_floors',
-      dict_building_work_type_floors: '/api/dictionaries/building_work_type_floors',
-      file_share_overlay_masks: '/api/fileshare',
-
-      // Project organizations
-      project_organizations: '/api/dictionaries/organizations',
-    };
-
-    return tableMap[this.table] || `/api/query/${this.table}`;
+    // Все запросы через generic CRUD роут — он парсит фильтры и строит SQL
+    const table = this.table === 'profiles' ? 'users' : this.table;
+    return `/api/query/${table}`;
   }
 
   private async executeGet(params: Record<string, string>): Promise<QueryResult<T>> {
-    const id = this.getIdFilter();
-    const path = id ? `${this.getPath()}/${id}` : this.getPath();
-
-    // Add table name for generic endpoint
-    params['_table'] = this.table;
+    const path = this.getPath();
 
     const result = await api.get<T>(path, params);
 
@@ -371,8 +294,6 @@ class QueryBuilder<T = unknown> implements PromiseLike<QueryResult<T>> {
 
   private async executePost(params: Record<string, string>): Promise<QueryResult<T>> {
     const path = this.getPath();
-    params['_table'] = this.table;
-
     const body = this.bodyData;
     const result = await api.post<T>(path, body);
 
@@ -391,17 +312,8 @@ class QueryBuilder<T = unknown> implements PromiseLike<QueryResult<T>> {
   private async executePatch(params: Record<string, string>): Promise<QueryResult<T>> {
     const id = this.getIdFilter();
     const path = id ? `${this.getPath()}/${id}` : this.getPath();
-    params['_table'] = this.table;
 
-    // Merge non-id filters into body for server-side filtering
-    const filtersForBody: Record<string, unknown> = {};
-    for (const f of this.filters) {
-      if (f.column !== 'id') {
-        filtersForBody[`_filter_${f.column}`] = `${f.op}.${f.value}`;
-      }
-    }
-
-    const body = { ...(this.bodyData as Record<string, unknown> || {}), ...filtersForBody };
+    const body = this.bodyData as Record<string, unknown> || {};
     const result = await api.patch<T>(path, body);
 
     if (result.error) {
@@ -418,10 +330,12 @@ class QueryBuilder<T = unknown> implements PromiseLike<QueryResult<T>> {
 
   private async executeDelete(params: Record<string, string>): Promise<QueryResult<T>> {
     const id = this.getIdFilter();
+    // DELETE с id → /api/query/table/id, без id → /api/query/table?filters
     const path = id ? `${this.getPath()}/${id}` : this.getPath();
-    params['_table'] = this.table;
 
-    const result = await api.delete<T>(path);
+    const result = id
+      ? await api.delete<T>(path)
+      : await api.delete<T>(path, params);
 
     if (result.error) {
       return { data: null, error: result.error, status: result.status };

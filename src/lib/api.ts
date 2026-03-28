@@ -194,8 +194,15 @@ export const api = {
     return request<T>('PUT', path, { body });
   },
 
-  delete<T = unknown>(path: string, body?: unknown) {
-    return request<T>('DELETE', path, { body });
+  delete<T = unknown>(path: string, bodyOrParams?: unknown) {
+    // If params is a plain object with string values, treat as query params
+    if (bodyOrParams && typeof bodyOrParams === 'object' && !Array.isArray(bodyOrParams)) {
+      const allStrings = Object.values(bodyOrParams as Record<string, unknown>).every(v => typeof v === 'string');
+      if (allStrings) {
+        return request<T>('DELETE', path, { params: bodyOrParams as Record<string, string> });
+      }
+    }
+    return request<T>('DELETE', path, { body: bodyOrParams });
   },
 
   rpc<T = unknown>(functionName: string, params?: Record<string, unknown>) {
