@@ -5,18 +5,28 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const caCertPath = path.join(__dirname, '../../certs/CA.pem');
+// Ищем CA.pem в нескольких местах
+const possiblePaths = [
+  path.join(__dirname, '../../certs/CA.pem'),       // dist/config → certs/
+  path.join(process.cwd(), 'server/certs/CA.pem'),  // корень проекта
+  path.join(process.cwd(), 'certs/CA.pem'),          // server/
+];
+const caCertPath = possiblePaths.find(p => fs.existsSync(p));
+const caCert = caCertPath ? fs.readFileSync(caCertPath, 'utf-8') : undefined;
+
+if (caCert) {
+  console.log(`DB SSL: CA.pem loaded from ${caCertPath}`);
+} else {
+  console.log('DB SSL: CA.pem not found, using rejectUnauthorized=false');
+}
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   max: 20,
   statement_timeout: 10000,
-  ssl: {
-    rejectUnauthorized: true,
-    ca: fs.existsSync(caCertPath)
-      ? fs.readFileSync(caCertPath, 'utf-8')
-      : undefined,
-  },
+  ssl: caCert
+    ? { rejectUnauthorized: true, ca: caCert }
+    : { rejectUnauthorized: false },
 });
 
 pool.on('error', (err) => {
