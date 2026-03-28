@@ -119,7 +119,9 @@ router.post('/login-by-name', async (req: AuthRequest, res: Response) => {
       }
     }
 
+    console.log(`[DEBUG] User found: ${user.last_name}, hash starts: ${user.password_hash?.substring(0, 10)}, hash length: ${user.password_hash?.length}`);
     const valid = await bcrypt.compare(password, user.password_hash);
+    console.log(`[DEBUG] bcrypt.compare result: ${valid}`);
 
     if (!valid) {
       res.status(401).json({ error: 'Неверный пароль' });
