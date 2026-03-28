@@ -287,8 +287,8 @@ router.post('/change-password', authMiddleware, async (req: AuthRequest, res: Re
   try {
     const { current_password, new_password } = req.body;
 
-    if (!current_password || !new_password) {
-      res.status(400).json({ error: 'Текущий и новый пароли обязательны' });
+    if (!new_password) {
+      res.status(400).json({ error: 'Новый пароль обязателен' });
       return;
     }
 
@@ -299,10 +299,17 @@ router.post('/change-password', authMiddleware, async (req: AuthRequest, res: Re
       return;
     }
 
-    const valid = await bcrypt.compare(current_password, result.rows[0].password_hash);
-    if (!valid) {
-      res.status(401).json({ error: 'Неверный текущий пароль' });
-      return;
+    // Если must_change_password — не требуем текущий пароль (вход по временному)
+    if (!result.rows[0].must_change_password) {
+      if (!current_password) {
+        res.status(400).json({ error: 'Текущий пароль обязателен' });
+        return;
+      }
+      const valid = await bcrypt.compare(current_password, result.rows[0].password_hash);
+      if (!valid) {
+        res.status(401).json({ error: 'Неверный текущий пароль' });
+        return;
+      }
     }
 
     const password_hash = await bcrypt.hash(new_password, 12);
