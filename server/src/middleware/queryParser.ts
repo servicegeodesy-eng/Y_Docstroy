@@ -202,29 +202,26 @@ function parseSelectString(selectStr: string, mainTable: string): { columns: str
         simpleCols.push(it.trim());
       }
 
-      // Determine FK
+      // Determine FK and direction
       let fkColumn = explicitFk;
       let isReverse = false;
 
-      if (!fkColumn) {
+      if (fkColumn) {
+        // Explicit FK given (e.g. profiles!user_id or profiles!created_by)
+        // This is always a forward FK: mainTable.fkColumn → joinedTable.id
+        isReverse = false;
+      } else {
+        // Auto-detect: try forward FK first, then reverse
         const fwd = findForwardFk(mainTable, table);
         if (fwd) {
           fkColumn = fwd;
+          isReverse = false;
         } else {
           const rev = findReverseFk(mainTable, table);
           if (rev) {
             fkColumn = rev;
             isReverse = true;
           }
-        }
-      } else {
-        // Explicit FK given — check if it's forward (main.fk → joined.id)
-        const fks = FK_MAP[mainTable];
-        if (fks && fks[fkColumn] === table) {
-          isReverse = false;
-        } else {
-          // Could be reverse with explicit FK name
-          isReverse = false;
         }
       }
 
