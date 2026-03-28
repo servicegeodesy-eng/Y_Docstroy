@@ -161,18 +161,20 @@ async function main() {
   }
   console.log('\n⚙ Seed-триггеры отключены\n');
 
-  // === Шаг 1: users (auth.users + profiles) ===
+  // === Шаг 1: users (из profiles, без auth.users — pooler не поддерживает auth схему) ===
+  // Пароли будут заданы как временные, пользователям нужно будет сбросить
   console.log('--- Шаг 1: users ---');
   const { rows: users } = await supabase.query(`
     SELECT
-      p.id, p.email, u.encrypted_password AS password_hash,
-      p.last_name, p.first_name, p.middle_name,
-      p.structure, p.organization, p.position, p.phone,
-      p.is_portal_admin, p.is_global_reader, p.must_change_password,
-      p.created_at, p.updated_at
-    FROM public.profiles p
-    JOIN auth.users u ON u.id = p.id
+      id, email, last_name, first_name, middle_name,
+      structure, organization, position, phone,
+      is_portal_admin, is_global_reader, must_change_password,
+      created_at, updated_at
+    FROM public.profiles
   `);
+
+  // Временный пароль — bcrypt hash для "changeme123"
+  const TEMP_PASSWORD_HASH = '$2a$12$LJ3m4ys2Y8EElyBGOCHrTe5OwUjHVe/XPyGi/dGDlr0YphFOGmjWq';
 
   let usersInserted = 0;
   for (const u of users) {
@@ -184,10 +186,10 @@ async function main() {
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
         ON CONFLICT (id) DO NOTHING
       `, [
-        u.id, u.email, u.password_hash,
+        u.id, u.email, TEMP_PASSWORD_HASH,
         u.last_name, u.first_name, u.middle_name || null,
         u.structure, u.organization, u.position, u.phone || null,
-        u.is_portal_admin || false, u.is_global_reader || false, u.must_change_password || false,
+        u.is_portal_admin || false, u.is_global_reader || false, true, // must_change_password = true
         u.created_at, u.updated_at,
       ]);
       usersInserted++;
