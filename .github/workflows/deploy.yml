@@ -1,0 +1,50 @@
+name: Deploy DocStroy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Build Frontend
+        run: |
+          npm ci
+          npm run build
+        env:
+          VITE_API_URL: https://api.docstroy.ru
+          VITE_GEO_HOSTNAME: geo.fvds.ru
+          VITE_VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+
+      - name: Build Backend
+        run: |
+          cd server
+          npm ci
+          npm run build
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd /var/www/docstroy
+            git pull origin main
+            npm ci --omit=dev
+            npm run build
+            cd server
+            npm ci --omit=dev
+            npm run build
+            cd ..
+            pm2 restart docstroy-api || pm2 start deploy/ecosystem.config.js
