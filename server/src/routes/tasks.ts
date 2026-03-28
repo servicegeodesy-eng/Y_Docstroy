@@ -10,8 +10,8 @@ router.use(authMiddleware);
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const projectId = parseInt(req.query.project_id as string, 10);
-    const targetUserId = parseInt(req.query.user_id as string, 10) || userId;
+    const projectId = req.query.project_id as string;
+    const targetUserId = req.query.user_id as string || userId;
 
     if (!projectId) {
       res.status(400).json({ error: 'project_id обязателен' });

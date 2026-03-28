@@ -7,16 +7,16 @@ import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
 
-function generateAccessToken(userId: number): string {
+function generateAccessToken(userId: string): string {
   return jwt.sign({ userId }, process.env.JWT_SECRET || '', {
-    expiresIn: process.env.JWT_EXPIRES_IN || '7d',
-  });
+    expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as string,
+  } as jwt.SignOptions);
 }
 
-function generateRefreshToken(userId: number): string {
+function generateRefreshToken(userId: string): string {
   return jwt.sign({ userId }, process.env.JWT_REFRESH_SECRET || '', {
-    expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d',
-  });
+    expiresIn: (process.env.JWT_REFRESH_EXPIRES_IN || '30d') as string,
+  } as jwt.SignOptions);
 }
 
 function setRefreshCookie(res: Response, token: string): void {
@@ -200,7 +200,7 @@ router.post('/refresh', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET || '') as { userId: number };
+    const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET || '') as { userId: string };
     const access_token = generateAccessToken(decoded.userId);
 
     res.json({ access_token });
@@ -394,9 +394,9 @@ router.delete('/user/:id', authMiddleware, async (req: AuthRequest, res: Respons
       return;
     }
 
-    const targetId = parseInt(req.params.id, 10);
+    const targetId = req.params.id;
 
-    if (isNaN(targetId)) {
+    if (!targetId) {
       res.status(400).json({ error: 'Некорректный ID пользователя' });
       return;
     }

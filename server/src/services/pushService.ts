@@ -21,7 +21,7 @@ interface PushPayload {
   data?: Record<string, unknown>;
 }
 
-export async function sendPushToUser(userId: string, payload: PushPayload): Promise<number> {
+export async function sendPushToUser(userId: string | number, payload: PushPayload): Promise<number> {
   const { rows: subscriptions } = await pool.query(
     'SELECT id, endpoint, p256dh, auth_key FROM push_subscriptions WHERE user_id = $1',
     [userId],
@@ -102,7 +102,7 @@ type CellAction = 'share' | 'sign' | 'comment' | 'status_changed';
 export async function notifyOnCellAction(
   cellId: string | number,
   action: CellAction,
-  actorId: string,
+  actorId: string | number,
   extra?: Record<string, unknown>,
 ): Promise<void> {
   try {
@@ -113,7 +113,7 @@ export async function notifyOnCellAction(
     if (rows.length === 0) return;
 
     const cell = rows[0];
-    const actorName = await getShortName(actorId);
+    const actorName = await getShortName(String(actorId));
     const cellName = cell.name || 'Без названия';
     const url = `/projects/${cell.project_id}/tasks`;
 

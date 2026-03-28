@@ -23,7 +23,7 @@ function getTableName(table: string): string | null {
 router.get('/:projectId', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const projectId = parseInt(req.params.projectId, 10);
+    const projectId = req.params.projectId;
 
     const access = await hasProjectAccess(userId, projectId);
     if (!access) {
@@ -116,7 +116,7 @@ router.patch('/:table/:id', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
     const tableName = getTableName(req.params.table);
-    const id = parseInt(req.params.id, 10);
+    const id = req.params.id;
 
     if (!tableName) {
       res.status(400).json({ error: 'Неизвестный справочник' });
@@ -171,7 +171,7 @@ router.delete('/:table/:id', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
     const tableName = getTableName(req.params.table);
-    const id = parseInt(req.params.id, 10);
+    const id = req.params.id;
 
     if (!tableName) {
       res.status(400).json({ error: 'Неизвестный справочник' });

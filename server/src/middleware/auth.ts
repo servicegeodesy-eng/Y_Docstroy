@@ -2,11 +2,11 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
 export interface AuthRequest extends Request {
-  userId?: number;
+  userId?: string;
 }
 
 interface JwtPayload {
-  userId: number;
+  userId: string;
 }
 
 export function authMiddleware(req: AuthRequest, res: Response, next: NextFunction): void {

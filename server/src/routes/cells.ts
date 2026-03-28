@@ -7,7 +7,7 @@ import { notifyOnCellAction } from '../services/pushService.js';
 const router = Router();
 router.use(authMiddleware);
 
-async function writeCellHistory(cellId: number, userId: number, action: string, details?: object): Promise<void> {
+async function writeCellHistory(cellId: string, userId: string, action: string, details?: object): Promise<void> {
   await pool.query(
     'INSERT INTO cell_history (cell_id, user_id, action, details) VALUES ($1, $2, $3, $4)',
     [cellId, userId, action, details ? JSON.stringify(details) : null]
@@ -18,7 +18,7 @@ async function writeCellHistory(cellId: number, userId: number, action: string, 
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const projectId = parseInt(req.query.project_id as string, 10);
+    const projectId = req.query.project_id as string;
     const cellType = req.query.cell_type as string || 'registry';
     const limit = Math.min(parseInt(req.query.limit as string, 10) || 100, 500);
     const offset = parseInt(req.query.offset as string, 10) || 0;
@@ -113,7 +113,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const cellId = parseInt(req.params.id, 10);
+    const cellId = req.params.id;
 
     const cellResult = await pool.query(
       `SELECT c.*,
@@ -245,7 +245,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 router.patch('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const cellId = parseInt(req.params.id, 10);
+    const cellId = req.params.id;
 
     const existing = await pool.query('SELECT * FROM cells WHERE id = $1', [cellId]);
     if (existing.rows.length === 0) {
@@ -307,7 +307,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response) => {
 router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const cellId = parseInt(req.params.id, 10);
+    const cellId = req.params.id;
 
     const existing = await pool.query('SELECT * FROM cells WHERE id = $1', [cellId]);
     if (existing.rows.length === 0) {
@@ -338,7 +338,7 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
 router.post('/:id/change-status', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const cellId = parseInt(req.params.id, 10);
+    const cellId = req.params.id;
     const { status, comment } = req.body;
 
     if (!status) {
@@ -380,7 +380,7 @@ router.post('/:id/change-status', async (req: AuthRequest, res: Response) => {
 router.post('/:id/send', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const cellId = parseInt(req.params.id, 10);
+    const cellId = req.params.id;
     const { to_user_id, send_type } = req.body;
 
     if (!to_user_id) {
@@ -441,7 +441,7 @@ router.post('/:id/send', async (req: AuthRequest, res: Response) => {
 router.post('/:id/sign', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const cellId = parseInt(req.params.id, 10);
+    const cellId = req.params.id;
     const { status, comment, files } = req.body;
 
     if (!status) {
@@ -482,7 +482,7 @@ router.post('/:id/sign', async (req: AuthRequest, res: Response) => {
 router.post('/:id/archive', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const cellId = parseInt(req.params.id, 10);
+    const cellId = req.params.id;
 
     const existing = await pool.query('SELECT project_id FROM cells WHERE id = $1', [cellId]);
     if (existing.rows.length === 0) {
@@ -514,7 +514,7 @@ router.post('/:id/archive', async (req: AuthRequest, res: Response) => {
 router.post('/:id/comment', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const cellId = parseInt(req.params.id, 10);
+    const cellId = req.params.id;
     const { text } = req.body;
 
     if (!text) {

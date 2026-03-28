@@ -9,7 +9,7 @@ router.use(authMiddleware);
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const targetUserId = parseInt(req.query.user_id as string, 10) || userId;
+    const targetUserId = req.query.user_id as string || userId;
     const limit = Math.min(parseInt(req.query.limit as string, 10) || 20, 100);
 
     // Users can only see their own notifications (unless admin logic is needed)
@@ -34,7 +34,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 router.patch('/:id/read', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const notificationId = parseInt(req.params.id, 10);
+    const notificationId = req.params.id;
 
     const result = await pool.query(
       'UPDATE notifications SET is_read = true WHERE id = $1 AND user_id = $2 RETURNING id',

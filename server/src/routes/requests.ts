@@ -10,7 +10,7 @@ router.use(authMiddleware);
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const projectId = parseInt(req.query.project_id as string, 10);
+    const projectId = req.query.project_id as string;
     const limit = Math.min(parseInt(req.query.limit as string, 10) || 100, 500);
     const offset = parseInt(req.query.offset as string, 10) || 0;
 
@@ -91,7 +91,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 router.patch('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const cellId = parseInt(req.params.id, 10);
+    const cellId = req.params.id;
 
     const existing = await pool.query("SELECT * FROM cells WHERE id = $1 AND cell_type = 'request'", [cellId]);
     if (existing.rows.length === 0) {
@@ -146,7 +146,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response) => {
 router.post('/:id/execute', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const cellId = parseInt(req.params.id, 10);
+    const cellId = req.params.id;
     const { status, comment } = req.body;
 
     const existing = await pool.query("SELECT * FROM cells WHERE id = $1 AND cell_type = 'request'", [cellId]);

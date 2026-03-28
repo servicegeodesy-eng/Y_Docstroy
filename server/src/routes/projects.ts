@@ -81,7 +81,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 router.patch('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const projectId = parseInt(req.params.id, 10);
+    const projectId = req.params.id;
     const { name, description } = req.body;
 
     const admin = await isPortalAdmin(userId);
@@ -135,7 +135,7 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const projectId = parseInt(req.params.id, 10);
+    const projectId = req.params.id;
     const result = await pool.query('DELETE FROM projects WHERE id = $1 RETURNING id', [projectId]);
 
     if (result.rows.length === 0) {

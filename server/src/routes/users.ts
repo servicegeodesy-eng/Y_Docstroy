@@ -10,7 +10,7 @@ router.use(authMiddleware);
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const projectId = parseInt(req.query.project_id as string, 10);
+    const projectId = req.query.project_id as string;
 
     if (!projectId) {
       res.status(400).json({ error: 'project_id обязателен' });
@@ -85,7 +85,7 @@ router.post('/project-member', async (req: AuthRequest, res: Response) => {
 router.patch('/project-member/:id', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const membershipId = parseInt(req.params.id, 10);
+    const membershipId = req.params.id;
 
     const existing = await pool.query('SELECT project_id FROM project_members WHERE id = $1', [membershipId]);
     if (existing.rows.length === 0) {
@@ -131,7 +131,7 @@ router.patch('/project-member/:id', async (req: AuthRequest, res: Response) => {
 router.delete('/project-member/:id', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const membershipId = parseInt(req.params.id, 10);
+    const membershipId = req.params.id;
 
     const existing = await pool.query('SELECT project_id FROM project_members WHERE id = $1', [membershipId]);
     if (existing.rows.length === 0) {

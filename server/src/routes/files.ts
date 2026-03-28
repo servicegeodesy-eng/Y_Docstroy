@@ -40,7 +40,7 @@ router.post('/cell', upload.single('file'), async (req: AuthRequest, res: Respon
       return;
     }
 
-    const access = await hasProjectAccess(userId, parseInt(projectId, 10));
+    const access = await hasProjectAccess(userId, projectId);
     if (!access) {
       res.status(403).json({ error: 'Нет доступа к проекту' });
       return;
@@ -74,7 +74,7 @@ router.post('/cell', upload.single('file'), async (req: AuthRequest, res: Respon
 router.post('/cell/:fileId/version', upload.single('file'), async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const fileId = parseInt(req.params.fileId, 10);
+    const fileId = req.params.fileId;
     const file = req.file;
 
     if (!file) {
@@ -279,7 +279,7 @@ router.post('/remove', async (req: AuthRequest, res: Response) => {
 router.delete('/cell/:fileId', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const fileId = parseInt(req.params.fileId, 10);
+    const fileId = req.params.fileId;
 
     const existing = await pool.query(
       `SELECT cf.*, c.project_id FROM cell_files cf

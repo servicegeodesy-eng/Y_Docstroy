@@ -10,7 +10,7 @@ router.use(authMiddleware);
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const projectId = parseInt(req.query.project_id as string, 10);
+    const projectId = req.query.project_id as string;
 
     if (!projectId) {
       res.status(400).json({ error: 'project_id обязателен' });
@@ -69,7 +69,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 router.patch('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const statusId = parseInt(req.params.id, 10);
+    const statusId = req.params.id;
 
     const existing = await pool.query('SELECT project_id FROM project_statuses WHERE id = $1', [statusId]);
     if (existing.rows.length === 0) {
@@ -117,7 +117,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response) => {
 router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const statusId = parseInt(req.params.id, 10);
+    const statusId = req.params.id;
 
     const existing = await pool.query('SELECT project_id FROM project_statuses WHERE id = $1', [statusId]);
     if (existing.rows.length === 0) {
@@ -144,7 +144,7 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
 router.post('/:id/roles', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const statusId = parseInt(req.params.id, 10);
+    const statusId = req.params.id;
     const { roles } = req.body;
 
     if (!Array.isArray(roles)) {

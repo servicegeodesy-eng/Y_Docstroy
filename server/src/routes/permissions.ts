@@ -64,8 +64,8 @@ router.put('/portal-roles', async (req: AuthRequest, res: Response) => {
 router.get('/user', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const projectId = parseInt(req.query.project_id as string, 10);
-    const targetUserId = parseInt(req.query.user_id as string, 10);
+    const projectId = req.query.project_id as string;
+    const targetUserId = req.query.user_id as string;
 
     if (!projectId || !targetUserId) {
       res.status(400).json({ error: 'project_id и user_id обязательны' });
@@ -142,7 +142,7 @@ router.put('/user', async (req: AuthRequest, res: Response) => {
 router.get('/cell-actions', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const projectId = parseInt(req.query.project_id as string, 10);
+    const projectId = req.query.project_id as string;
 
     if (!projectId) {
       res.status(400).json({ error: 'project_id обязателен' });

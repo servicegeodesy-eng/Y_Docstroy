@@ -12,7 +12,7 @@ router.use(authMiddleware);
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const projectId = parseInt(req.query.project_id as string, 10);
+    const projectId = req.query.project_id as string;
 
     if (!projectId) {
       res.status(400).json({ error: 'project_id обязателен' });
@@ -104,7 +104,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 router.patch('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const overlayId = parseInt(req.params.id, 10);
+    const overlayId = req.params.id;
 
     const existing = await pool.query('SELECT project_id FROM dict_overlays WHERE id = $1', [overlayId]);
     if (existing.rows.length === 0) {
@@ -152,7 +152,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response) => {
 router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const overlayId = parseInt(req.params.id, 10);
+    const overlayId = req.params.id;
 
     const existing = await pool.query('SELECT project_id, image_path FROM dict_overlays WHERE id = $1', [overlayId]);
     if (existing.rows.length === 0) {
@@ -191,7 +191,7 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
 router.post('/:id/axis-link', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const overlayId = parseInt(req.params.id, 10);
+    const overlayId = req.params.id;
     const { axis_grid_id, x, y } = req.body;
 
     const existing = await pool.query('SELECT project_id FROM dict_overlays WHERE id = $1', [overlayId]);
@@ -222,7 +222,7 @@ router.post('/:id/axis-link', async (req: AuthRequest, res: Response) => {
 router.get('/:id/axis-points', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const overlayId = parseInt(req.params.id, 10);
+    const overlayId = req.params.id;
 
     const existing = await pool.query('SELECT project_id FROM dict_overlays WHERE id = $1', [overlayId]);
     if (existing.rows.length === 0) {
@@ -252,7 +252,7 @@ router.get('/:id/axis-points', async (req: AuthRequest, res: Response) => {
 router.post('/:id/axis-points', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const overlayId = parseInt(req.params.id, 10);
+    const overlayId = req.params.id;
     const { points } = req.body;
 
     if (!Array.isArray(points)) {

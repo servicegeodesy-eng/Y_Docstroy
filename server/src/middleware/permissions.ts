@@ -1,14 +1,14 @@
 import pool from '../config/db.js';
 
-export async function getUserProjectIds(userId: number): Promise<number[]> {
+export async function getUserProjectIds(userId: string): Promise<string[]> {
   const result = await pool.query(
     'SELECT project_id FROM project_members WHERE user_id = $1',
     [userId]
   );
-  return result.rows.map((r: { project_id: number }) => r.project_id);
+  return result.rows.map((r: { project_id: string }) => r.project_id);
 }
 
-export async function isPortalAdmin(userId: number): Promise<boolean> {
+export async function isPortalAdmin(userId: string): Promise<boolean> {
   const result = await pool.query(
     'SELECT is_portal_admin FROM users WHERE id = $1',
     [userId]
@@ -16,7 +16,7 @@ export async function isPortalAdmin(userId: number): Promise<boolean> {
   return result.rows[0]?.is_portal_admin === true;
 }
 
-export async function isGlobalReader(userId: number): Promise<boolean> {
+export async function isGlobalReader(userId: string): Promise<boolean> {
   const result = await pool.query(
     'SELECT is_global_reader FROM users WHERE id = $1',
     [userId]
@@ -24,7 +24,7 @@ export async function isGlobalReader(userId: number): Promise<boolean> {
   return result.rows[0]?.is_global_reader === true;
 }
 
-export async function isProjectAdmin(userId: number, projectId: number): Promise<boolean> {
+export async function isProjectAdmin(userId: string, projectId: string): Promise<boolean> {
   const result = await pool.query(
     "SELECT id FROM project_members WHERE user_id = $1 AND project_id = $2 AND role = 'admin'",
     [userId, projectId]
@@ -32,7 +32,7 @@ export async function isProjectAdmin(userId: number, projectId: number): Promise
   return result.rows.length > 0;
 }
 
-export async function hasProjectAccess(userId: number, projectId: number): Promise<boolean> {
+export async function hasProjectAccess(userId: string, projectId: string): Promise<boolean> {
   const admin = await isPortalAdmin(userId);
   if (admin) return true;
 
@@ -46,7 +46,7 @@ export async function hasProjectAccess(userId: number, projectId: number): Promi
   return result.rows.length > 0;
 }
 
-export async function hasPermission(userId: number, projectId: number, permission: string): Promise<boolean> {
+export async function hasPermission(userId: string, projectId: string, permission: string): Promise<boolean> {
   const admin = await isPortalAdmin(userId);
   if (admin) return true;
 
