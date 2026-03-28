@@ -47,6 +47,9 @@ router.get('/:table', async (req: AuthRequest, res: Response) => {
     }
 
     const { text, values } = buildSelectSQL(table, req);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[SQL] ${table}: ${text.substring(0, 200)}`);
+    }
     const result = await pool.query(text, values);
 
     const isCountOnly = req.query.head === 'true';
