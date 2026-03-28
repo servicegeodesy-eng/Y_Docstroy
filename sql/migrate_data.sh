@@ -10,8 +10,8 @@
 set -euo pipefail
 
 # === НАСТРОЙКИ — заполни перед запуском ===
-SUPABASE_URL="postgresql://postgres.jbjnqjedqumzkxcfmeyo:PASSWORD@aws-0-eu-central-1.pooler.supabase.com:6543/postgres"
-YANDEX_URL="postgresql://user:password@host:6432/dbname?sslmode=verify-full"
+SUPABASE_URL='postgresql://postgres:BntU@114338@db.jbjnqjedqumzkxcfmeyo.supabase.co:5432/postgres'
+YANDEX_URL='postgresql://docstroy_admin:D0c$tr0Y@rc1b-dodaeuotgajif7fu.mdb.yandexcloud.net:6432/docstroy?sslmode=verify-full'
 
 DUMP_DIR="./sql/dump"
 mkdir -p "$DUMP_DIR"

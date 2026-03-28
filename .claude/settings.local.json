@@ -11,7 +11,12 @@
       "Bash(sed -i 's/parseInt\\(req\\\\.params\\\\.projectId, 10\\)/req.params.projectId/g' \"$f\")",
       "Bash(sed -i 's/parseInt\\(req\\\\.params\\\\.fileId, 10\\)/req.params.fileId/g' \"$f\")",
       "Bash(cp \"c:/Users/usr/claudeprojects/tickhonovich/DocStroy/CLAUDE.md\" \"c:/Users/usr/claudeprojects/tickhonovich/Y_Docstroy/CLAUDE.md\")",
-      "Bash(echo $?)"
+      "Bash(echo $?)",
+      "Bash(curl -o \"c:/Users/usr/claudeprojects/tickhonovich/Y_Docstroy/server/certs/CA.pem\" https://storage.yandexcloud.net/cloud-certs/CA.pem)",
+      "Bash(bash sql/migrate_data.sh)",
+      "Bash(where psql:*)",
+      "Bash(where.exe psql:*)",
+      "Read(//c/Program Files/**)"
     ],
     "additionalDirectories": [
       "c:\\Users\\usr\\claudeprojects\\tickhonovich\\DocStroy\\src"
