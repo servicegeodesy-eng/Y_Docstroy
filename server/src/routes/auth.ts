@@ -92,11 +92,16 @@ router.post('/login-by-name', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const lastName = query.trim().split(/\s+/)[0];
+    const searchTerm = query.trim();
 
     const result = await pool.query(
-      'SELECT id, email, display_name, password_hash, last_name, first_name, middle_name, is_portal_admin, is_global_reader FROM users WHERE lower(last_name) = lower($1)',
-      [lastName]
+      `SELECT id, email, display_name, password_hash, last_name, first_name, middle_name, is_portal_admin, is_global_reader
+       FROM users
+       WHERE lower(last_name) = lower($1)
+          OR lower(last_name) LIKE lower($2)
+          OR lower(display_name) = lower($1)
+          OR lower(display_name) LIKE lower($2)`,
+      [searchTerm, searchTerm + '%']
     );
 
     if (result.rows.length === 0) {
