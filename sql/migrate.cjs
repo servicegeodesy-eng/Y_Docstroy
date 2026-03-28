@@ -17,7 +17,7 @@ const caCertPath = path.join(__dirname, '..', 'server', 'certs', 'CA.pem');
 
 // Supabase Pooler (Transaction mode, порт 6543)
 const supabase = new Pool({
-  host: 'aws-0-eu-central-1.pooler.supabase.com',
+  host: 'aws-1-ap-northeast-1.pooler.supabase.com',
   port: 6543,
   database: 'postgres',
   user: 'postgres.jbjnqjedqumzkxcfmeyo',
