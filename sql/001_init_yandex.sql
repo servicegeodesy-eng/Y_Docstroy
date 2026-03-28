@@ -9,7 +9,7 @@
 -- ============================
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
-CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+-- pg_trgm не доступен в Yandex Managed PostgreSQL, поиск по фамилии через btree + lower()
 
 -- ============================
 -- 2. ENUM TYPES
@@ -90,7 +90,8 @@ CREATE TABLE users (
 
 CREATE INDEX idx_users_email        ON users (email);
 CREATE INDEX idx_users_phone        ON users (phone) WHERE phone IS NOT NULL;
-CREATE INDEX idx_users_display_name ON users USING gin (display_name gin_trgm_ops);
+CREATE INDEX idx_users_last_name_lower ON users (lower(last_name));
+CREATE INDEX idx_users_display_name    ON users (display_name);
 
 -- -------------------------------------------------
 -- projects
