@@ -21,7 +21,7 @@ const supabase = new Pool({
   port: 6543,
   database: 'postgres',
   user: 'postgres.jbjnqjedqumzkxcfmeyo',
-  password: 'BntU@114338',
+  password: '1QwertYqazxswEdCbnj',
   ssl: { rejectUnauthorized: false },
   // Таймаут подключения 15 секунд
   connectionTimeoutMillis: 15000,
