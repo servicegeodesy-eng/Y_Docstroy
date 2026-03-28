@@ -5,6 +5,9 @@ import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import { errorHandler } from './middleware/errorHandler.js';
 import authRoutes from './routes/auth.js';
+import projectRoutes from './routes/projects.js';
+import cellRoutes from './routes/cells.js';
+import fileRoutes from './routes/files.js';
 
 dotenv.config();
 
@@ -23,6 +26,9 @@ app.use(cookieParser());
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/projects', projectRoutes);
+app.use('/api/cells', cellRoutes);
+app.use('/api/files', fileRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {
