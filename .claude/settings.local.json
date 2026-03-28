@@ -16,7 +16,10 @@
       "Bash(bash sql/migrate_data.sh)",
       "Bash(where psql:*)",
       "Bash(where.exe psql:*)",
-      "Read(//c/Program Files/**)"
+      "Read(//c/Program Files/**)",
+      "Bash(nslookup db.jbjnqjedqumzkxcfmeyo.supabase.co)",
+      "Bash(rm -f sql/migrate.cjs sql/migrate_data.sh sql/export_as_inserts.sql sql/export_supabase_data.sql)",
+      "Bash(rm -rf sql/dump)"
     ],
     "additionalDirectories": [
       "c:\\Users\\usr\\claudeprojects\\tickhonovich\\DocStroy\\src"
