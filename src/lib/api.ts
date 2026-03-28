@@ -259,7 +259,7 @@ export const auth = {
     return { data: { user: null }, error: result.error };
   },
 
-  async signOut() {
+  async signOut(_options?: { scope?: string }) {
     await request('POST', '/api/auth/logout');
     clearToken();
     emitAuthEvent('SIGNED_OUT', null);

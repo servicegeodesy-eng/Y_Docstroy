@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@800;900&display=swap" rel="stylesheet" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#1E3A5F" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="DocStroy" />
+    <title>DocStroy</title>
+    <script>
+      // Geo-режим: подменяем манифест, title, мета-теги и favicon
+      (function() {
+        var host = window.location.hostname;
+        var isGeo = host === 'geo.fvds.ru' || host.indexOf('geo.') === 0;
+        if (!isGeo) return;
+
+        document.title = 'Служба Геодезии';
+
+        var metaTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+        if (metaTitle) metaTitle.setAttribute('content', 'Служба Геодезии');
+
+        // Подменяем favicon на geo-иконку (СГ — тахеометр)
+        var favicon = document.querySelector('link[rel="icon"]');
+        if (favicon) favicon.setAttribute('href', '/geo-icon.svg');
+
+        var appleIcon = document.querySelector('link[rel="apple-touch-icon"]');
+        if (appleIcon) appleIcon.setAttribute('href', '/geo-icon.svg');
+
+        // Подменяем манифест — сразу и через observer (VitePWA добавляет его позже при сборке)
+        function replaceManifest() {
+          var m = document.querySelector('link[rel="manifest"]');
+          if (m) { m.setAttribute('href', '/manifest-geo.json'); return true; }
+          return false;
+        }
+        if (!replaceManifest()) {
+          // Манифест ещё не добавлен — ждём через MutationObserver
+          var obs = new MutationObserver(function() {
+            if (replaceManifest()) obs.disconnect();
+          });
+          obs.observe(document.head, { childList: true });
+          // Fallback: если VitePWA так и не добавил — создаём сами
+          setTimeout(function() {
+            obs.disconnect();
+            if (!document.querySelector('link[rel="manifest"]')) {
+              var link = document.createElement('link');
+              link.rel = 'manifest';
+              link.href = '/manifest-geo.json';
+              document.head.appendChild(link);
+            }
+          }, 3000);
+        }
+      })();
+    </script>
+  </head>
+  <body class="min-h-screen antialiased transition-colors" style="background: var(--ds-surface-sunken)">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

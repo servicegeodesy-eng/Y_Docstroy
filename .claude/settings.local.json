@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/usr/claudeprojects/tickhonovich/DocStroy/**)",
+      "Bash(find c:/Users/usr/claudeprojects/tickhonovich/DocStroy -type f -name *.sql)",
+      "Read(//c/Users/usr/claudeprojects/tickhonovich/**)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\usr\\claudeprojects\\tickhonovich\\DocStroy\\src"
+    ]
+  }
+}
