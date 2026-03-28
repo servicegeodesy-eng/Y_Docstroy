@@ -7,6 +7,10 @@
 const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
+const dns = require('dns');
+
+// Принудительно IPv4 для всех подключений
+dns.setDefaultResultOrder('ipv4first');
 
 // === НАСТРОЙКИ ===
 const caCertPath = path.join(__dirname, '..', 'server', 'certs', 'CA.pem');
