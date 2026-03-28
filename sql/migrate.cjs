@@ -32,7 +32,7 @@ const yandex = new Pool({
   port: 6432,
   database: 'docstroy',
   user: 'docstroy_admin',
-  password: 'D0c$tr0Y',
+  password: 'BntU114338',
   ssl: {
     rejectUnauthorized: true,
     ca: fs.existsSync(caCertPath) ? fs.readFileSync(caCertPath, 'utf-8') : undefined,
