@@ -26,9 +26,10 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   max: 20,
   statement_timeout: 10000,
-  ssl: caCert
-    ? { rejectUnauthorized: true, ca: caCert }
-    : { rejectUnauthorized: false },
+  ssl: {
+    rejectUnauthorized: false,
+    ca: caCert || undefined,
+  },
 });
 
 pool.on('error', (err) => {
