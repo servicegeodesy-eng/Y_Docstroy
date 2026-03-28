@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
-import pool from '../config/db.js';
-import { authMiddleware, AuthRequest } from '../middleware/auth.js';
-import { getUserProjectIds, isPortalAdmin, isProjectAdmin } from '../middleware/permissions.js';
+import pool from '../config/db';
+import { authMiddleware, AuthRequest } from '../middleware/auth';
+import { getUserProjectIds, isPortalAdmin, isProjectAdmin } from '../middleware/permissions';
 
 const router = Router();
 router.use(authMiddleware);

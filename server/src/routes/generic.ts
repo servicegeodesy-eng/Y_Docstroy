@@ -5,14 +5,14 @@
  */
 
 import { Router, Response } from 'express';
-import pool from '../config/db.js';
-import { authMiddleware, AuthRequest } from '../middleware/auth.js';
-import { hasProjectAccess, isPortalAdmin, isGlobalReader } from '../middleware/permissions.js';
+import pool from '../config/db';
+import { authMiddleware, AuthRequest } from '../middleware/auth';
+import { hasProjectAccess, isPortalAdmin, isGlobalReader } from '../middleware/permissions';
 import {
   parseQuery, buildSelectSQL,
   isAllowedTable, resolveTableName,
   requiresProjectAccess, getProjectIdColumn,
-} from '../middleware/queryParser.js';
+} from '../middleware/queryParser';
 
 const router = Router();
 router.use(authMiddleware);

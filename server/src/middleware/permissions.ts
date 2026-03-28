@@ -1,4 +1,4 @@
-import pool from '../config/db.js';
+import pool from '../config/db';
 
 export async function getUserProjectIds(userId: string): Promise<string[]> {
   const result = await pool.query(

@@ -1,8 +1,8 @@
 import { Router, Response } from 'express';
-import pool from '../config/db.js';
-import { authMiddleware, AuthRequest } from '../middleware/auth.js';
-import { hasProjectAccess } from '../middleware/permissions.js';
-import { notifyOnCellAction } from '../services/pushService.js';
+import pool from '../config/db';
+import { authMiddleware, AuthRequest } from '../middleware/auth';
+import { hasProjectAccess } from '../middleware/permissions';
+import { notifyOnCellAction } from '../services/pushService';
 
 const router = Router();
 router.use(authMiddleware);

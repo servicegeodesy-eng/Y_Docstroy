@@ -1,5 +1,5 @@
 import webpush from 'web-push';
-import pool from '../config/db.js';
+import pool from '../config/db';
 
 // Initialize VAPID (idempotent — safe to call at import time)
 if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {

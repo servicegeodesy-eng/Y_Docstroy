@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import webpush from 'web-push';
-import pool from '../config/db.js';
-import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import pool from '../config/db';
+import { authMiddleware, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 router.use(authMiddleware);

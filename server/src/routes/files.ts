@@ -4,10 +4,10 @@ import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import { PutObjectCommand, GetObjectCommand, DeleteObjectCommand, DeleteObjectsCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import pool from '../config/db.js';
-import s3Client from '../config/s3.js';
-import { authMiddleware, AuthRequest } from '../middleware/auth.js';
-import { hasProjectAccess } from '../middleware/permissions.js';
+import pool from '../config/db';
+import s3Client from '../config/s3';
+import { authMiddleware, AuthRequest } from '../middleware/auth';
+import { hasProjectAccess } from '../middleware/permissions';
 import { Readable } from 'stream';
 
 const router = Router();

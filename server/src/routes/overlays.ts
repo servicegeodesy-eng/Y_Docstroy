@@ -1,9 +1,9 @@
 import { Router, Response } from 'express';
-import pool from '../config/db.js';
+import pool from '../config/db';
 import { DeleteObjectCommand } from '@aws-sdk/client-s3';
-import s3Client from '../config/s3.js';
-import { authMiddleware, AuthRequest } from '../middleware/auth.js';
-import { hasProjectAccess } from '../middleware/permissions.js';
+import s3Client from '../config/s3';
+import { authMiddleware, AuthRequest } from '../middleware/auth';
+import { hasProjectAccess } from '../middleware/permissions';
 
 const router = Router();
 router.use(authMiddleware);
