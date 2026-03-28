@@ -9,15 +9,23 @@ const fs = require('fs');
 const path = require('path');
 
 // === НАСТРОЙКИ ===
-const SUPABASE_URL = 'postgresql://postgres:BntU@114338@db.jbjnqjedqumzkxcfmeyo.supabase.co:5432/postgres';
-const YANDEX_URL = 'postgresql://docstroy_admin:D0c$tr0Y@rc1b-dodaeuotgajif7fu.mdb.yandexcloud.net:6432/docstroy';
-
 const caCertPath = path.join(__dirname, '..', 'server', 'certs', 'CA.pem');
 
-const supabase = new Pool({ connectionString: SUPABASE_URL });
+const supabase = new Pool({
+  host: 'aws-0-eu-central-1.pooler.supabase.com',
+  port: 6543,
+  database: 'postgres',
+  user: 'postgres.jbjnqjedqumzkxcfmeyo',
+  password: 'BntU@114338',
+  ssl: { rejectUnauthorized: false },
+});
 
 const yandex = new Pool({
-  connectionString: YANDEX_URL,
+  host: 'rc1b-dodaeuotgajif7fu.mdb.yandexcloud.net',
+  port: 6432,
+  database: 'docstroy',
+  user: 'docstroy_admin',
+  password: 'D0c$tr0Y',
   ssl: {
     rejectUnauthorized: true,
     ca: fs.existsSync(caCertPath) ? fs.readFileSync(caCertPath, 'utf-8') : undefined,
