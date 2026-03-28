@@ -149,9 +149,17 @@ async function main() {
     process.exit(1);
   }
 
-  // Отключить триггеры на время импорта
-  await yandex.query("SET session_replication_role = 'replica'");
-  console.log('\n⚙ Триггеры отключены\n');
+  // Отключить seed-триггеры на время импорта (чтобы не дублировать данные)
+  const TRIGGERS_TO_DISABLE = [
+    'ALTER TABLE projects DISABLE TRIGGER trg_project_created_seed_statuses',
+    'ALTER TABLE projects DISABLE TRIGGER trg_project_created_seed_dictionaries',
+    'ALTER TABLE project_statuses DISABLE TRIGGER trg_seed_cap_on_status',
+    'ALTER TABLE users DISABLE TRIGGER protect_user_fields_trigger',
+  ];
+  for (const sql of TRIGGERS_TO_DISABLE) {
+    try { await yandex.query(sql); } catch (e) { console.log(`  ⚠ ${e.message}`); }
+  }
+  console.log('\n⚙ Seed-триггеры отключены\n');
 
   // === Шаг 1: users (auth.users + profiles) ===
   console.log('--- Шаг 1: users ---');
@@ -205,7 +213,15 @@ async function main() {
   }
 
   // Включить триггеры обратно
-  await yandex.query("SET session_replication_role = 'origin'");
+  const TRIGGERS_TO_ENABLE = [
+    'ALTER TABLE projects ENABLE TRIGGER trg_project_created_seed_statuses',
+    'ALTER TABLE projects ENABLE TRIGGER trg_project_created_seed_dictionaries',
+    'ALTER TABLE project_statuses ENABLE TRIGGER trg_seed_cap_on_status',
+    'ALTER TABLE users ENABLE TRIGGER protect_user_fields_trigger',
+  ];
+  for (const sql of TRIGGERS_TO_ENABLE) {
+    try { await yandex.query(sql); } catch (e) { console.log(`  ⚠ ${e.message}`); }
+  }
   console.log('\n⚙ Триггеры включены');
 
   console.log(`\n=== Готово! ===`);
