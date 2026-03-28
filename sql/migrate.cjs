@@ -15,15 +15,16 @@ dns.setDefaultResultOrder('ipv4first');
 // === НАСТРОЙКИ ===
 const caCertPath = path.join(__dirname, '..', 'server', 'certs', 'CA.pem');
 
-// Supabase Pooler (Session mode, порт 5432) — имеет IPv4
-// Формат user: postgres.PROJECT_REF
+// Supabase Pooler (Transaction mode, порт 6543)
 const supabase = new Pool({
   host: 'aws-0-eu-central-1.pooler.supabase.com',
-  port: 5432,
+  port: 6543,
   database: 'postgres',
   user: 'postgres.jbjnqjedqumzkxcfmeyo',
   password: 'BntU@114338',
   ssl: { rejectUnauthorized: false },
+  // Таймаут подключения 15 секунд
+  connectionTimeoutMillis: 15000,
 });
 
 const yandex = new Pool({
