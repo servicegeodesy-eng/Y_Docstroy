@@ -182,10 +182,27 @@ function parseSelectString(selectStr: string, mainTable: string): { columns: str
   const tokens = tokenize(selectStr);
 
   for (const token of tokens) {
-    // Match: [alias:]table[!modifier](inner_content)
+    // Match Supabase select syntax:
+    //   table(cols)                    → table join
+    //   alias:table!fk(cols)           → aliased join via FK
+    //   table!inner(cols)              → inner join
+    // Note: "profiles:user_id" is NOT alias:table — it's a shorthand
+    // Supabase format: alias:table!fk_column(cols) where alias≠fk
+    // But old DocStroy code uses: profiles!created_by(cols) — table!fk
+    // And: creator:profiles!created_by(cols) — alias:table!fk
     const m = token.match(/^(?:(\w+):)?(\w+)(?:!(\w+))?\((.+)\)$/s);
     if (m) {
-      const [, alias, rawTable, modifier, innerContent] = m;
+      let [, alias, rawTable, modifier, innerContent] = m;
+
+      // Handle ambiguous format: "profiles:user_id(cols)"
+      // Could be alias:table or table:fk — detect by checking if rawTable is a real table
+      if (alias && !isAllowedTable(resolveTableName(rawTable)) && isAllowedTable(resolveTableName(alias))) {
+        // "profiles:user_id" → table=profiles, fk=user_id (not alias=profiles, table=user_id)
+        modifier = rawTable;  // user_id becomes the FK
+        rawTable = alias;     // profiles becomes the table
+        alias = '';           // no alias
+      }
+
       const table = resolveTableName(rawTable);
       const isInner = modifier === 'inner';
       const explicitFk = (!isInner && modifier) ? modifier : '';
