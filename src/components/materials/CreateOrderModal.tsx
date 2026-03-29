@@ -121,13 +121,9 @@ export default function CreateOrderModal({ onClose, onCreated, editOrder }: Prop
 
   const handleSubmit = async (status: "ordered" | "draft") => {
     if (!project) return;
-    if (!selBuilding || !selWorkType) {
-      setError("Выберите здание и вид работ");
-      return;
-    }
     const validItems = items.filter((it) => it.material_name && it.quantity && Number(it.quantity) > 0);
     if (validItems.length === 0) {
-      setError("Добавьте хотя бы одну позицию");
+      setError("Укажите номенклатуру, единицы измерения и количество");
       return;
     }
 

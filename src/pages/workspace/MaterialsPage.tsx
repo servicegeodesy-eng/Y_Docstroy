@@ -519,8 +519,8 @@ function RemainingTab({ groups }: { groups: RemainingGroup[] }) {
   return (
     <div className="space-y-4">
       {groups.map((group, gi) => {
-        const location = [group.building_name, group.work_type_name, group.floor_name, group.construction_name]
-          .filter(Boolean).join(" / ");
+        const locationParts = [group.building_name, group.work_type_name, group.floor_name, group.construction_name].filter(Boolean);
+        const location = locationParts.length > 0 ? locationParts.join(" / ") : "Общее (без привязки к месту)";
         return (
           <div key={gi} className="ds-card overflow-hidden">
             <div className="px-4 py-3 border-b" style={{ borderColor: "var(--ds-border)", background: "var(--ds-surface-sunken)" }}>
