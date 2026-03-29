@@ -82,7 +82,7 @@ const FILE_TABLES = [
     projectQuery: `
       SELECT cfv.id, cfv.storage_path, cf.cell_id, c.project_id, p.company_id
       FROM cell_file_versions cfv
-      JOIN cell_files cf ON cf.id = cfv.cell_file_id
+      JOIN cell_files cf ON cf.id = cfv.file_id
       JOIN cells c ON c.id = cf.cell_id
       JOIN projects p ON p.id = c.project_id
       WHERE cfv.storage_path NOT LIKE '%/projects/%'
@@ -147,9 +147,9 @@ const FILE_TABLES = [
     pathCol: 'storage_path',
     legacyBucket: 'fileshare-files',
     projectQuery: `
-      SELECT fsf.id, fsf.storage_path, fsf.file_share_id, fs.project_id, p.company_id
+      SELECT fsf.id, fsf.storage_path, fsf.share_id, fs.project_id, p.company_id
       FROM file_share_files fsf
-      JOIN file_shares fs ON fs.id = fsf.file_share_id
+      JOIN file_shares fs ON fs.id = fsf.share_id
       JOIN projects p ON p.id = fs.project_id
       WHERE fsf.storage_path NOT LIKE '%/projects/%'
     `,
@@ -256,7 +256,12 @@ async function main() {
   }
 
   for (const config of FILE_TABLES) {
-    await migrateTable(config);
+    try {
+      await migrateTable(config);
+    } catch (err) {
+      console.error(`  [FATAL] Таблица ${config.table}: ${err.message}`);
+      stats.errors++;
+    }
   }
 
   console.log('\n=== Итоги ===');
