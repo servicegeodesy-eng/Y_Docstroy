@@ -42,7 +42,7 @@ export default function SubscriptionBanner() {
     });
   }, [companyId]);
 
-  if (dismissed || !data) return null;
+  if (dismissed || !data || !data.users || !data.storage) return null;
 
   const warnings: { text: string; color: string; bg: string; border: string }[] = [];
 
