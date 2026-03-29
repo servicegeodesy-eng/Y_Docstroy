@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import DropdownPortal from "@/components/ui/DropdownPortal";
 import { useMobile } from "@/lib/MobileContext";
 import { useDictionaries } from "@/hooks/useDictionaries";
@@ -23,12 +24,21 @@ import type { MaskWithCell } from "@/hooks/useCellMasks";
  * - facades: все 4 связи (Место работ + Вид работ + Уровни/срезы + Конструкция)
  * - landscaping: 3 связи (Место работ + Вид работ + Конструкция) без Уровней
  */
-export type OverlayMode = "plan" | "facades" | "landscaping";
+export type OverlayMode = "plan" | "facades" | "landscaping" | "roof" | "floors" | "walls" | "frame" | "territory" | "earthwork" | "foundation" | "shoring" | "piles";
 
 const MODE_TITLES: Record<OverlayMode, string> = {
   plan: "План",
   facades: "Фасады",
   landscaping: "Благоустройство",
+  roof: "Кровля",
+  floors: "Полы и потолки",
+  walls: "Стены",
+  frame: "Каркас",
+  territory: "Территория строительства",
+  earthwork: "Объёмы земляных масс",
+  foundation: "Основание",
+  shoring: "Ограждение котлована",
+  piles: "Сваи",
 };
 
 interface Props {
@@ -89,7 +99,11 @@ function loadSaved(mode: string): SavedSelection {
   } catch { return { building: "", workType: "", floor: "", construction: "", overlay: "" }; }
 }
 
+const CONSTRUCTION_MODES: Set<OverlayMode> = new Set(["roof", "floors", "walls", "frame", "territory", "earthwork", "foundation", "shoring", "piles"]);
+
 export default function PlanPage({ mode = "plan" }: Props) {
+  const { projectId } = useParams();
+  const navigate = useNavigate();
   const { hasPermission } = useProject();
   const { isMobile } = useMobile();
   const { buildings, workTypes, floors, constructions, works, loadDicts } = useDictionaries();
@@ -421,7 +435,21 @@ export default function PlanPage({ mode = "plan" }: Props) {
     <div className="space-y-4">
       {/* Заголовок */}
       <div className={`flex items-center justify-between ${isMobile ? "mb-1" : "mb-2"}`}>
-        <h2 className={`font-semibold ${isMobile ? "text-lg" : "text-xl"}`} style={{ color: "var(--ds-text)" }}>{title}</h2>
+        <div className="flex items-center gap-2">
+          {CONSTRUCTION_MODES.has(mode) && (
+            <button
+              onClick={() => navigate(`/projects/${projectId}/construction`)}
+              className="p-1.5 rounded-lg transition-colors hover:bg-[var(--ds-surface-raised)]"
+              style={{ color: "var(--ds-text-muted)" }}
+              title="Назад к процессу строительства"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+          )}
+          <h2 className={`font-semibold ${isMobile ? "text-lg" : "text-xl"}`} style={{ color: "var(--ds-text)" }}>{title}</h2>
+        </div>
         <div className="flex items-center gap-2" data-print-hide>
           {hasPermission("can_print") && !isMobile && (
             <button
