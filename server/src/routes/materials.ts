@@ -1,10 +1,18 @@
 import { Router, Response } from 'express';
+import multer from 'multer';
+import { v4 as uuidv4 } from 'uuid';
+import path from 'path';
+import { PutObjectCommand } from '@aws-sdk/client-s3';
 import pool from '../config/db';
+import s3Client from '../config/s3';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { hasProjectAccess } from '../middleware/permissions';
 
 const router = Router();
 router.use(authMiddleware);
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+const MAIN_BUCKET = process.env.S3_BUCKET || 'docstroy';
 
 // ============================================================================
 // GET /api/materials/orders?project_id=...&status=...
@@ -317,6 +325,80 @@ router.get('/nomenclature', async (req: AuthRequest, res: Response) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Get nomenclature error:', err);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// ============================================================================
+// POST /api/materials/orders/files — загрузить файл к заказу
+// ============================================================================
+
+router.post('/orders/files', upload.single('file'), async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const file = req.file;
+    const orderId = req.body.order_id;
+
+    if (!file || !orderId) {
+      res.status(400).json({ error: 'file и order_id обязательны' });
+      return;
+    }
+
+    const order = await pool.query('SELECT project_id FROM material_orders WHERE id = $1', [orderId]);
+    if (order.rows.length === 0) { res.status(404).json({ error: 'Заказ не найден' }); return; }
+
+    const projectId = order.rows[0].project_id;
+    const ext = path.extname(file.originalname);
+    const storagePath = `${projectId}/materials/${orderId}/${uuidv4()}${ext}`;
+
+    await s3Client.send(new PutObjectCommand({
+      Bucket: MAIN_BUCKET, Key: storagePath, Body: file.buffer, ContentType: file.mimetype,
+    }));
+
+    const result = await pool.query(
+      `INSERT INTO material_order_files (order_id, file_name, storage_path, file_size, mime_type, uploaded_by)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [orderId, file.originalname, storagePath, file.size, file.mimetype, userId]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error('Upload order file error:', err);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// ============================================================================
+// POST /api/materials/deliveries/files — загрузить фото/файл поступления
+// ============================================================================
+
+router.post('/deliveries/files', upload.single('file'), async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const file = req.file;
+    const deliveryId = req.body.delivery_id;
+
+    if (!file || !deliveryId) {
+      res.status(400).json({ error: 'file и delivery_id обязательны' });
+      return;
+    }
+
+    const ext = path.extname(file.originalname);
+    const storagePath = `deliveries/${deliveryId}/${uuidv4()}${ext}`;
+
+    await s3Client.send(new PutObjectCommand({
+      Bucket: MAIN_BUCKET, Key: storagePath, Body: file.buffer, ContentType: file.mimetype,
+    }));
+
+    const result = await pool.query(
+      `INSERT INTO material_delivery_files (delivery_id, file_name, storage_path, file_size, mime_type, uploaded_by)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [deliveryId, file.originalname, storagePath, file.size, file.mimetype, userId]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error('Upload delivery file error:', err);
     res.status(500).json({ error: 'Ошибка сервера' });
   }
 });
