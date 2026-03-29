@@ -136,27 +136,32 @@ export default function ConstructionMapPage() {
   const dk = typeof document !== "undefined" && document.documentElement.classList.contains("dark");
   const p = (l: string, d: string) => `url(#${dk ? d : l})`;
 
-  /* ---- Layout ---- */
+  /* ---- MIRRORED Layout: Frame LEFT, Facade RIGHT ---- */
   const GL = 300;
-  const BX = 280, BY = 80, BW = 210, BH = GL - BY;
-  const FX = BX + BW, FY = BY, FW = 115, FH = BH;
-  const RoofPeak = 38, RoofLeft = BX - 22, RoofRight = FX + FW + 22;
+  const FW = 115, BW = 210;
+  // Frame on LEFT, then Facade on RIGHT
+  const FX = 250, FY = 80; // frame starts here
+  const BX = FX + FW;       // facade starts right of frame = 365
+  const BY = 80, BH = GL - BY, FH = BH;
+  const RoofPeak = 38, RoofLeft = FX - 22, RoofRight = BX + BW + 22;
   const SheetW = 14;
-  const ShoringLeft = BX - 16, ShoringRight = FX + FW + 16;
+  const ShoringLeft = FX - 16, ShoringRight = BX + BW + 16;
   const ShoringTop = GL + 6, FoundH = 22, PitH = 28;
   const PitBottom = ShoringTop + FoundH + PitH;
   const ShoringBottom = PitBottom + 40;
   const PitTop = ShoringTop + FoundH;
   const PileLen = 130;
-  // Earthwork — closer to building
-  const PileX = 220, PileW = 100, PileH = 44;
-  // Landscaping — closer to building
-  const LandX = FX + FW + 14;
+  // Landscaping — LEFT side, close to frame
   const LandW = 120;
+  const LandX = FX - 14 - LandW; // = 250-14-120 = 116
+  // Earthwork — RIGHT side, close to facade
+  const PileW = 100, PileH = 44;
+  const PileX = BX + BW + 16 + PileW / 2; // = 575+16+50 = 641
 
-  // Tight viewBox
+  // ViewBox
   const VT = 12, VB = PitTop + PileLen + 24;
-  const VL = 30, VR = LandX + LandW + 140; // room for right labels
+  const VL = LandX - 140; // room for left labels
+  const VR = PileX + PileW / 2 + 140; // room for right labels
 
   // Territory fence
   const FenceLeft = VL + 20, FenceRight = VR - 20;
@@ -165,13 +170,15 @@ export default function ConstructionMapPage() {
   const frameCols = [0, 1, 2].map(i => FX + 14 + i * ((FW - 28) / 2));
   const frameRows = [0, 1, 2, 3, 4].map(i => FY + i * (FH / 4));
 
-  // Right column labels (above ground): Кровля, Фасад, Каркас, Стены
-  const rcX = VR - 6;
-  const rcY = { roof: VT + 6, facade: VT + 38, frame: VT + 70, walls: VT + 102 };
-
-  // Left column labels (below ground): Объёмы, Основание, Ограждение, Сваи
+  // LEFT column labels (above ground): Кровля, Фасад, Каркас, Стены
   const lcX = VL + 4;
-  const lcY = { earthwork: GL + 10, foundation: GL + 52, pit: GL + 84, piles: GL + 130 };
+  const aboveY = { roof: VT + 6, facade: VT + 38, frame: VT + 70, walls: VT + 102 };
+
+  // LEFT column labels (below ground): Основание, Ограждение, Сваи — SAME position
+  const belowY = { foundation: GL + 10, pit: GL + 46, piles: GL + 92 };
+
+  // RIGHT labels: Объёмы земляных масс
+  const rcX = VR - 6;
 
   return (
     <div className="flex-1 flex items-center justify-center min-h-0 overflow-hidden select-none"
@@ -187,7 +194,7 @@ export default function ConstructionMapPage() {
         <line x1={VL} y1={GL} x2={VR} y2={GL} stroke={dk ? "#556677" : "#8a7a6a"} strokeWidth="2.5" />
         <rect x={VL} y={GL - 5} width={VR - VL} height="7" fill={p("pat-grass", "pat-grass-dk")} opacity="0.6" />
 
-        {/* TERRITORY — отдельно, у пунктирной рамки */}
+        {/* TERRITORY — отдельно, справа у пунктирной рамки */}
         <g {...zoneProps("territory")}>
           <rect x={FenceLeft} y={GL - 76} width={FenceRight - FenceLeft} height="76" fill="none"
             stroke={dk ? "#7aaad0" : "#2c5a8a"} strokeWidth="1.5" strokeDasharray="12 6"
@@ -195,10 +202,53 @@ export default function ConstructionMapPage() {
           {Array.from({ length: 9 }, (_, i) => FenceLeft + i * ((FenceRight - FenceLeft) / 8)).map(x => (
             <line key={`fp-${x}`} x1={x} y1={GL - 76} x2={x} y2={GL - 68} stroke={dk ? "#7aaad0" : "#2c5a8a"} strokeWidth="2" opacity="0.5" />
           ))}
-          <FramedLabel x={FenceLeft + 4} y={GL - 74} text="Территория" text2="строительства" dk={dk} id="territory" hovered={hovered} />
+          <FramedLabel x={FenceRight - 6} y={GL - 74} text="Территория" text2="строительства" anchor="end" dk={dk} id="territory" hovered={hovered} />
         </g>
 
-        {/* FACADE */}
+        {/* LANDSCAPING — LEFT side */}
+        <g {...zoneProps("landscaping")}>
+          <rect x={LandX} y={GL-5} width={LandW} height="7" fill={p("pat-grass", "pat-grass-dk")} />
+          <rect x={LandX+46} y={GL-56} width="8" height="52" rx="3" fill={dk ? "#5a4a30" : "#8a7050"} />
+          <ellipse cx={LandX+50} cy={GL-72} rx="26" ry="22" fill={dk ? "#2a5a28" : "#6ab060"} opacity="0.7" />
+          <ellipse cx={LandX+40} cy={GL-80} rx="18" ry="15" fill={dk ? "#2d6a2a" : "#78c068"} opacity="0.65" />
+          <ellipse cx={LandX+60} cy={GL-76} rx="16" ry="14" fill={dk ? "#256025" : "#68b858"} opacity="0.6" />
+          <ellipse cx={LandX+50} cy={GL-90} rx="14" ry="11" fill={dk ? "#308030" : "#80c878"} opacity="0.55" />
+          <ellipse cx={LandX+100} cy={GL-10} rx="14" ry="9" fill={dk ? "#2a5a28" : "#6ab060"} opacity="0.6" />
+          <ellipse cx={LandX+94} cy={GL-14} rx="10" ry="7" fill={dk ? "#308030" : "#78c068"} opacity="0.5" />
+          <path d={`M${LandX} ${GL-2}Q${LandX+40} ${GL-5} ${LandX+80} ${GL-2}Q${LandX+100} ${GL+1} ${LandX+LandW} ${GL-2}`}
+            fill="none" stroke={dk ? "#6a7a8a" : "#b0a898"} strokeWidth="2.5" opacity="0.5" strokeLinecap="round" />
+          <FramedLabel x={LandX - 6} y={GL - 60} text="Благо-" text2="устройство" anchor="end" dk={dk} id="landscaping" hovered={hovered}
+            lineFromX={LandX + 50} lineFromY={GL - 40} />
+        </g>
+
+        {/* FRAME — LEFT side of building */}
+        <g {...zoneProps("frame")}>
+          <rect x={FX} y={FY} width={FW} height={FH} fill={dk ? "#1a2a3a" : "#eef3f8"} stroke={dk ? "#4a6070" : "#5a7a9a"} strokeWidth="2" />
+          {frameRows.map((sy, i) => (
+            <rect key={`sl-${i}`} x={FX} y={sy - 4} width={FW} height="8" fill={p("pat-concrete", "pat-concrete-dk")} stroke={dk ? "#5a7a90" : "#7a8a9a"} strokeWidth="0.8" />
+          ))}
+          {frameCols.map((cx, i) => (
+            <rect key={`cl-${i}`} x={cx - 5} y={FY} width="10" height={FH} fill={p("pat-concrete", "pat-concrete-dk")} stroke={dk ? "#5a7a90" : "#7a8a9a"} strokeWidth="0.8" />
+          ))}
+          <FramedLabel x={lcX} y={aboveY.frame} text="Каркас" dk={dk} id="frame" hovered={hovered}
+            lineFromX={FX + 20} lineFromY={FY + FH * 0.3} />
+        </g>
+
+        {/* WALLS — brick infill in frame */}
+        <g {...zoneProps("walls")}>
+          {[0,1,2,3].map(row => [0,1].map(col => {
+            const cx1 = frameCols[col] + 6, cx2 = frameCols[col + 1] - 6;
+            const ry1 = frameRows[row] + 5, ry2 = frameRows[row + 1] - 5;
+            return (
+              <rect key={`wall-${row}-${col}`} x={cx1} y={ry1} width={cx2 - cx1} height={ry2 - ry1}
+                fill={p("pat-brick", "pat-brick-dk")} stroke={dk ? "#5a5045" : "#b0a090"} strokeWidth="0.6" rx="1" />
+            );
+          }))}
+          <FramedLabel x={lcX} y={aboveY.walls} text="Стены" dk={dk} id="walls" hovered={hovered}
+            lineFromX={FX + FW / 2} lineFromY={FY + FH * 0.6} />
+        </g>
+
+        {/* FACADE — RIGHT side of building */}
         <g {...zoneProps("facade")}>
           <rect x={BX} y={BY} width={BW} height={BH} fill={p("pat-brick", "pat-brick-dk")} stroke={dk ? "#667788" : "#6a5a4a"} strokeWidth="2" />
           {[0,1,2,3].map(row => [0,1,2].map(col => {
@@ -211,35 +261,8 @@ export default function ConstructionMapPage() {
           }))}
           <rect x={BX+78} y={BY+BH-48} width="54" height="48" rx="3" fill={dk ? "#2a3848" : "#5a4a3a"} stroke={dk ? "#4a6070" : "#4a3a2a"} strokeWidth="1.5" />
           <circle cx={BX+122} cy={BY+BH-22} r="3" fill={dk ? "#8ab0d0" : "#c8a868"} />
-          <FramedLabel x={rcX} y={rcY.facade} text="Фасад" anchor="end" dk={dk} id="facade" hovered={hovered}
-            lineFromX={BX + BW - 20} lineFromY={BY + BH / 2} />
-        </g>
-
-        {/* FRAME */}
-        <g {...zoneProps("frame")}>
-          <rect x={FX} y={FY} width={FW} height={FH} fill={dk ? "#1a2a3a" : "#eef3f8"} stroke={dk ? "#4a6070" : "#5a7a9a"} strokeWidth="2" />
-          {frameRows.map((sy, i) => (
-            <rect key={`sl-${i}`} x={FX} y={sy - 4} width={FW} height="8" fill={p("pat-concrete", "pat-concrete-dk")} stroke={dk ? "#5a7a90" : "#7a8a9a"} strokeWidth="0.8" />
-          ))}
-          {frameCols.map((cx, i) => (
-            <rect key={`cl-${i}`} x={cx - 5} y={FY} width="10" height={FH} fill={p("pat-concrete", "pat-concrete-dk")} stroke={dk ? "#5a7a90" : "#7a8a9a"} strokeWidth="0.8" />
-          ))}
-          <FramedLabel x={rcX} y={rcY.frame} text="Каркас" anchor="end" dk={dk} id="frame" hovered={hovered}
-            lineFromX={FX + FW - 10} lineFromY={FY + FH * 0.3} />
-        </g>
-
-        {/* WALLS */}
-        <g {...zoneProps("walls")}>
-          {[0,1,2,3].map(row => [0,1].map(col => {
-            const cx1 = frameCols[col] + 6, cx2 = frameCols[col + 1] - 6;
-            const ry1 = frameRows[row] + 5, ry2 = frameRows[row + 1] - 5;
-            return (
-              <rect key={`wall-${row}-${col}`} x={cx1} y={ry1} width={cx2 - cx1} height={ry2 - ry1}
-                fill={p("pat-brick", "pat-brick-dk")} stroke={dk ? "#5a5045" : "#b0a090"} strokeWidth="0.6" rx="1" />
-            );
-          }))}
-          <FramedLabel x={rcX} y={rcY.walls} text="Стены" anchor="end" dk={dk} id="walls" hovered={hovered}
-            lineFromX={FX + FW / 2} lineFromY={FY + FH * 0.6} />
+          <FramedLabel x={lcX} y={aboveY.facade} text="Фасад" dk={dk} id="facade" hovered={hovered}
+            lineFromX={BX + 30} lineFromY={BY + BH / 2} />
         </g>
 
         {/* ROOF */}
@@ -251,40 +274,20 @@ export default function ConstructionMapPage() {
             const ly = RoofPeak + (BY - RoofPeak) * t, mid = (RoofLeft + RoofRight) / 2;
             return <line key={`rt-${t}`} x1={RoofLeft+(mid-RoofLeft)*(1-t)+10} y1={ly} x2={RoofRight-(RoofRight-mid)*(1-t)-10} y2={ly} stroke={dk ? "#4a6888" : "#4a6888"} strokeWidth="0.6" opacity="0.4" />;
           })}
-          <FramedLabel x={rcX} y={rcY.roof} text="Кровля" anchor="end" dk={dk} id="roof" hovered={hovered}
-            lineFromX={RoofRight - 20} lineFromY={RoofPeak + 14} />
+          <FramedLabel x={lcX} y={aboveY.roof} text="Кровля" dk={dk} id="roof" hovered={hovered}
+            lineFromX={RoofLeft + 30} lineFromY={RoofPeak + 14} />
         </g>
 
-        {/* EARTHWORK — closer to building */}
+        {/* EARTHWORK — RIGHT side */}
         <g {...zoneProps("earthwork")}>
           <path d={`M${PileX-PileW/2} ${GL} Q${PileX-PileW/2+8} ${GL-PileH*0.6} ${PileX-PileW/4} ${GL-PileH*0.85} Q${PileX} ${GL-PileH-4} ${PileX+PileW/4} ${GL-PileH*0.8} Q${PileX+PileW/2-8} ${GL-PileH*0.5} ${PileX+PileW/2} ${GL}Z`}
             fill={p("pat-pile", "pat-pile-dk")} stroke={dk ? "#5a5040" : "#8a7a60"} strokeWidth="1.5" strokeLinejoin="round" />
           <path d={`M${PileX-PileW/2+10} ${GL-PileH*0.3}Q${PileX} ${GL-PileH*0.4} ${PileX+PileW/2-10} ${GL-PileH*0.25}`} fill="none" stroke={dk ? "#6a6050" : "#a09070"} strokeWidth="0.8" opacity="0.5" />
-          <FramedLabel x={lcX} y={lcY.earthwork} text="Объёмы" text2="земляных масс" dk={dk} id="earthwork" hovered={hovered}
+          <FramedLabel x={rcX} y={GL + 10} text="Объёмы" text2="земляных масс" anchor="end" dk={dk} id="earthwork" hovered={hovered}
             lineFromX={PileX} lineFromY={GL + 4} />
         </g>
 
-        {/* LANDSCAPING — closer to building */}
-        <g {...zoneProps("landscaping")}>
-          <rect x={LandX} y={GL-5} width={LandW} height="7" fill={p("pat-grass", "pat-grass-dk")} />
-          {/* Tree */}
-          <rect x={LandX+46} y={GL-56} width="8" height="52" rx="3" fill={dk ? "#5a4a30" : "#8a7050"} />
-          <ellipse cx={LandX+50} cy={GL-72} rx="26" ry="22" fill={dk ? "#2a5a28" : "#6ab060"} opacity="0.7" />
-          <ellipse cx={LandX+40} cy={GL-80} rx="18" ry="15" fill={dk ? "#2d6a2a" : "#78c068"} opacity="0.65" />
-          <ellipse cx={LandX+60} cy={GL-76} rx="16" ry="14" fill={dk ? "#256025" : "#68b858"} opacity="0.6" />
-          <ellipse cx={LandX+50} cy={GL-90} rx="14" ry="11" fill={dk ? "#308030" : "#80c878"} opacity="0.55" />
-          {/* Bush */}
-          <ellipse cx={LandX+100} cy={GL-10} rx="14" ry="9" fill={dk ? "#2a5a28" : "#6ab060"} opacity="0.6" />
-          <ellipse cx={LandX+94} cy={GL-14} rx="10" ry="7" fill={dk ? "#308030" : "#78c068"} opacity="0.5" />
-          {/* Path */}
-          <path d={`M${LandX} ${GL-2}Q${LandX+40} ${GL-5} ${LandX+80} ${GL-2}Q${LandX+100} ${GL+1} ${LandX+LandW} ${GL-2}`}
-            fill="none" stroke={dk ? "#6a7a8a" : "#b0a898"} strokeWidth="2.5" opacity="0.5" strokeLinecap="round" />
-          {/* Label — отдельно, рядом с зоной */}
-          <FramedLabel x={LandX + LandW + 6} y={GL - 60} text="Благо-" text2="устройство" dk={dk} id="landscaping" hovered={hovered}
-            lineFromX={LandX + 60} lineFromY={GL - 40} />
-        </g>
-
-        {/* SHORING */}
+        {/* SHORING — stays centered */}
         <g {...zoneProps("pit")}>
           <rect x={ShoringLeft} y={ShoringTop} width={SheetW} height={ShoringBottom - ShoringTop}
             fill={p("pat-sheet", "pat-sheet-dk")} stroke={dk ? "#5a7a90" : "#5a7a9a"} strokeWidth="1.5" />
@@ -292,19 +295,19 @@ export default function ConstructionMapPage() {
             fill={p("pat-sheet", "pat-sheet-dk")} stroke={dk ? "#5a7a90" : "#5a7a9a"} strokeWidth="1.5" />
           <rect x={ShoringLeft+SheetW} y={PitTop} width={ShoringRight-ShoringLeft-SheetW*2} height={PitH}
             fill={dk ? "#141e2e" : "#e4dcd0"} stroke={dk ? "#3a4a5a" : "#a09888"} strokeWidth="0.5" />
-          <FramedLabel x={lcX} y={lcY.pit} text="Ограждение" text2="котлована" dk={dk} id="pit" hovered={hovered}
+          <FramedLabel x={lcX} y={belowY.pit} text="Ограждение" text2="котлована" dk={dk} id="pit" hovered={hovered}
             lineFromX={ShoringLeft + SheetW / 2} lineFromY={(ShoringTop + ShoringBottom) / 2} />
         </g>
 
-        {/* FOUNDATION */}
+        {/* FOUNDATION — stays centered */}
         <g {...zoneProps("foundation")}>
           <rect x={ShoringLeft+SheetW} y={ShoringTop} width={ShoringRight-ShoringLeft-SheetW*2} height={FoundH}
             fill={p("pat-concrete", "pat-concrete-dk")} stroke={dk ? "#5a7a90" : "#7a8a9a"} strokeWidth="1.5" />
-          <FramedLabel x={lcX} y={lcY.foundation} text="Основание" dk={dk} id="foundation" hovered={hovered}
+          <FramedLabel x={lcX} y={belowY.foundation} text="Основание" dk={dk} id="foundation" hovered={hovered}
             lineFromX={ShoringLeft + SheetW + 50} lineFromY={ShoringTop + FoundH / 2} />
         </g>
 
-        {/* PILES */}
+        {/* PILES — stays centered */}
         <g {...zoneProps("piles")}>
           {Array.from({ length: 7 }, (_, i) => {
             const px = ShoringLeft + SheetW + 20 + i * ((ShoringRight - ShoringLeft - SheetW * 2 - 40) / 6);
@@ -314,7 +317,7 @@ export default function ConstructionMapPage() {
               <polygon points={`${px-4},${pTop+pLen} ${px},${pTop+pLen+8} ${px+4},${pTop+pLen}`} fill={dk ? "#3b4a5c" : "#b0bcc8"} stroke={dk ? "#5a7a90" : "#7a8a9a"} strokeWidth="0.8" />
             </g>);
           })}
-          <FramedLabel x={lcX} y={lcY.piles} text="Сваи" dk={dk} id="piles" hovered={hovered}
+          <FramedLabel x={lcX} y={belowY.piles} text="Сваи" dk={dk} id="piles" hovered={hovered}
             lineFromX={ShoringLeft + SheetW + 50} lineFromY={PitTop + PileLen / 2} />
         </g>
       </svg>
