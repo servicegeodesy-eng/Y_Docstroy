@@ -217,8 +217,8 @@ export default function ConstructionMapPage() {
           <ellipse cx={LandX+94} cy={GL-14} rx="10" ry="7" fill={dk ? "#308030" : "#78c068"} opacity="0.5" />
           <path d={`M${LandX} ${GL-2}Q${LandX+40} ${GL-5} ${LandX+80} ${GL-2}Q${LandX+100} ${GL+1} ${LandX+LandW} ${GL-2}`}
             fill="none" stroke={dk ? "#6a7a8a" : "#b0a898"} strokeWidth="2.5" opacity="0.5" strokeLinecap="round" />
-          <FramedLabel x={LandX - 6} y={GL - 60} text="Благо-" text2="устройство" anchor="end" dk={dk} id="landscaping" hovered={hovered}
-            lineFromX={LandX + 50} lineFromY={GL - 40} />
+          <FramedLabel x={lcX} y={GL - 56} text="Благоустройство" dk={dk} id="landscaping" hovered={hovered}
+            lineFromX={LandX + 50} lineFromY={GL - 30} />
         </g>
 
         {/* FRAME — LEFT side of building */}
@@ -231,7 +231,7 @@ export default function ConstructionMapPage() {
             <rect key={`cl-${i}`} x={cx - 5} y={FY} width="10" height={FH} fill={p("pat-concrete", "pat-concrete-dk")} stroke={dk ? "#5a7a90" : "#7a8a9a"} strokeWidth="0.8" />
           ))}
           <FramedLabel x={lcX} y={aboveY.frame} text="Каркас" dk={dk} id="frame" hovered={hovered}
-            lineFromX={FX + 20} lineFromY={FY + FH * 0.3} />
+            lineFromX={FX + FW / 2} lineFromY={FY + 30} />
         </g>
 
         {/* WALLS — brick infill in frame */}
@@ -245,7 +245,7 @@ export default function ConstructionMapPage() {
             );
           }))}
           <FramedLabel x={lcX} y={aboveY.walls} text="Стены" dk={dk} id="walls" hovered={hovered}
-            lineFromX={FX + FW / 2} lineFromY={FY + FH * 0.6} />
+            lineFromX={FX + FW / 2} lineFromY={FY + FH * 0.5} />
         </g>
 
         {/* FACADE — RIGHT side of building */}
@@ -262,7 +262,7 @@ export default function ConstructionMapPage() {
           <rect x={BX+78} y={BY+BH-48} width="54" height="48" rx="3" fill={dk ? "#2a3848" : "#5a4a3a"} stroke={dk ? "#4a6070" : "#4a3a2a"} strokeWidth="1.5" />
           <circle cx={BX+122} cy={BY+BH-22} r="3" fill={dk ? "#8ab0d0" : "#c8a868"} />
           <FramedLabel x={lcX} y={aboveY.facade} text="Фасад" dk={dk} id="facade" hovered={hovered}
-            lineFromX={BX + 30} lineFromY={BY + BH / 2} />
+            lineFromX={BX + BW / 2} lineFromY={BY + 30} />
         </g>
 
         {/* ROOF */}
@@ -275,7 +275,7 @@ export default function ConstructionMapPage() {
             return <line key={`rt-${t}`} x1={RoofLeft+(mid-RoofLeft)*(1-t)+10} y1={ly} x2={RoofRight-(RoofRight-mid)*(1-t)-10} y2={ly} stroke={dk ? "#4a6888" : "#4a6888"} strokeWidth="0.6" opacity="0.4" />;
           })}
           <FramedLabel x={lcX} y={aboveY.roof} text="Кровля" dk={dk} id="roof" hovered={hovered}
-            lineFromX={RoofLeft + 30} lineFromY={RoofPeak + 14} />
+            lineFromX={(RoofLeft + RoofRight) / 2} lineFromY={RoofPeak + 6} />
         </g>
 
         {/* EARTHWORK — RIGHT side */}
@@ -284,7 +284,7 @@ export default function ConstructionMapPage() {
             fill={p("pat-pile", "pat-pile-dk")} stroke={dk ? "#5a5040" : "#8a7a60"} strokeWidth="1.5" strokeLinejoin="round" />
           <path d={`M${PileX-PileW/2+10} ${GL-PileH*0.3}Q${PileX} ${GL-PileH*0.4} ${PileX+PileW/2-10} ${GL-PileH*0.25}`} fill="none" stroke={dk ? "#6a6050" : "#a09070"} strokeWidth="0.8" opacity="0.5" />
           <FramedLabel x={rcX} y={GL + 10} text="Объёмы" text2="земляных масс" anchor="end" dk={dk} id="earthwork" hovered={hovered}
-            lineFromX={PileX} lineFromY={GL + 4} />
+            lineFromX={PileX + PileW / 4} lineFromY={GL - PileH / 2} />
         </g>
 
         {/* SHORING — stays centered */}
@@ -318,7 +318,7 @@ export default function ConstructionMapPage() {
             </g>);
           })}
           <FramedLabel x={lcX} y={belowY.piles} text="Сваи" dk={dk} id="piles" hovered={hovered}
-            lineFromX={ShoringLeft + SheetW + 50} lineFromY={PitTop + PileLen / 2} />
+            lineFromX={ShoringLeft + SheetW + 40} lineFromY={PitTop + PileLen * 0.7} />
         </g>
       </svg>
     </div>
