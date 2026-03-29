@@ -30,7 +30,12 @@ interface ChessCell {
 
 type FilterKey = "building" | "workType" | "construction" | "set";
 
-export default function ChessboardReport() {
+interface ChessboardProps {
+  /** Фильтр по типу зоны — показать только данные подложек с этим tab_type */
+  zoneMode?: string;
+}
+
+export default function ChessboardReport({ zoneMode }: ChessboardProps = {}) {
   const { project, hasPermission } = useProject();
   const { isMobile } = useMobile();
   const { statuses, getColorKey } = useProjectStatuses();
@@ -71,10 +76,11 @@ export default function ChessboardReport() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [openFilter]);
 
-  // ID справочников, связанных с подложками фасадов/благоустройства (исключаются из шахматки)
-  const [excludedWorkTypes, setExcludedWorkTypes] = useState<Set<string>>(new Set());
-  const [excludedFloors, setExcludedFloors] = useState<Set<string>>(new Set());
-  const [excludedConstructions, setExcludedConstructions] = useState<Set<string>>(new Set());
+  // Режим фильтрации: exclude (обычная шахматка) или include (зона процесса строительства)
+  const [filterMode, setFilterMode] = useState<"exclude" | "include">("exclude");
+  const [filteredWorkTypes2, setFilteredWorkTypes2] = useState<Set<string>>(new Set());
+  const [filteredFloors2, setFilteredFloors2] = useState<Set<string>>(new Set());
+  const [filteredConstructions2, setFilteredConstructions2] = useState<Set<string>>(new Set());
 
   const loadData = useCallback(async () => {
     if (!project) return;
@@ -125,41 +131,59 @@ export default function ChessboardReport() {
       wtOverlays = (wRes.data || []) as { work_type_id: string; overlay_id: string }[];
     }
 
-    // Определить какие подложки — фасады или благоустройство
-    const overlaysWithConstructions = new Set(olConstructions.map((r) => r.overlay_id));
+    if (zoneMode) {
+      // Режим зоны: показать только данные подложек с данным tab_type
+      const zoneOverlays = new Set<string>();
+      for (const oId of overlayIds) {
+        if (overlayTabTypes.get(oId) === zoneMode) zoneOverlays.add(oId);
+      }
+      const inclWT = new Set<string>();
+      const inclFL = new Set<string>();
+      const inclCN = new Set<string>();
+      for (const r of wtOverlays) {
+        if (zoneOverlays.has(r.overlay_id)) inclWT.add(r.work_type_id);
+      }
+      for (const r of olFloors) {
+        if (zoneOverlays.has(r.overlay_id)) inclFL.add(r.floor_id);
+      }
+      for (const r of olConstructions) {
+        if (zoneOverlays.has(r.overlay_id)) inclCN.add(r.construction_id);
+      }
+      setFilterMode("include");
+      setFilteredWorkTypes2(inclWT);
+      setFilteredFloors2(inclFL);
+      setFilteredConstructions2(inclCN);
+    } else {
+      // Обычная шахматка: исключить фасады/благоустройство и все новые типы зон
+      const overlaysWithConstructions = new Set(olConstructions.map((r) => r.overlay_id));
 
-    const facadeLandscapingOverlays = new Set<string>();
-    for (const oId of overlayIds) {
-      const tabType = overlayTabTypes.get(oId);
-      if (tabType) {
-        // tab_type задан вручную
-        if (tabType === "facades" || tabType === "landscaping") {
-          facadeLandscapingOverlays.add(oId);
-        }
-      } else {
-        // Автоопределение: есть конструкции → фасад или благоустройство
-        if (overlaysWithConstructions.has(oId)) {
-          facadeLandscapingOverlays.add(oId);
+      const nonPlanOverlays = new Set<string>();
+      for (const oId of overlayIds) {
+        const tabType = overlayTabTypes.get(oId);
+        if (tabType) {
+          if (tabType !== "plan") nonPlanOverlays.add(oId);
+        } else {
+          if (overlaysWithConstructions.has(oId)) nonPlanOverlays.add(oId);
         }
       }
-    }
 
-    // Собрать исключаемые ID справочников
-    const exclWT = new Set<string>();
-    const exclFL = new Set<string>();
-    const exclCN = new Set<string>();
-    for (const r of wtOverlays) {
-      if (facadeLandscapingOverlays.has(r.overlay_id)) exclWT.add(r.work_type_id);
+      const exclWT = new Set<string>();
+      const exclFL = new Set<string>();
+      const exclCN = new Set<string>();
+      for (const r of wtOverlays) {
+        if (nonPlanOverlays.has(r.overlay_id)) exclWT.add(r.work_type_id);
+      }
+      for (const r of olFloors) {
+        if (nonPlanOverlays.has(r.overlay_id)) exclFL.add(r.floor_id);
+      }
+      for (const r of olConstructions) {
+        if (nonPlanOverlays.has(r.overlay_id)) exclCN.add(r.construction_id);
+      }
+      setFilterMode("exclude");
+      setFilteredWorkTypes2(exclWT);
+      setFilteredFloors2(exclFL);
+      setFilteredConstructions2(exclCN);
     }
-    for (const r of olFloors) {
-      if (facadeLandscapingOverlays.has(r.overlay_id)) exclFL.add(r.floor_id);
-    }
-    for (const r of olConstructions) {
-      if (facadeLandscapingOverlays.has(r.overlay_id)) exclCN.add(r.construction_id);
-    }
-    setExcludedWorkTypes(exclWT);
-    setExcludedFloors(exclFL);
-    setExcludedConstructions(exclCN);
 
     if (floorsData) {
       setAllFloors(floorsData.map((f: { id: string; name: string; sort_order: number }) => ({ id: f.id, name: f.name, sort: f.sort_order })));
@@ -189,13 +213,13 @@ export default function ChessboardReport() {
 
     }
     setLoading(false);
-  }, [project]);
+  }, [project, zoneMode]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  // Уникальные значения для фильтров (исключая связанные с фасадами/благоустройством)
+  // Уникальные значения для фильтров
   const filterOptions = useMemo(() => {
     const buildings = new Map<string, string>();
     const workTypes = new Map<string, string>();
@@ -203,10 +227,14 @@ export default function ChessboardReport() {
     const sets = new Map<string, string>();
     for (const c of cells) {
       if (c.building_id && c.building_name) buildings.set(c.building_id, c.building_name);
-      if (c.work_type_id && c.work_type_name && !excludedWorkTypes.has(c.work_type_id))
-        workTypes.set(c.work_type_id, c.work_type_name);
-      if (c.construction_id && c.construction_name && !excludedConstructions.has(c.construction_id))
-        constructions.set(c.construction_id, c.construction_name);
+      if (c.work_type_id && c.work_type_name) {
+        if (filterMode === "include" ? filteredWorkTypes2.has(c.work_type_id) : !filteredWorkTypes2.has(c.work_type_id))
+          workTypes.set(c.work_type_id, c.work_type_name);
+      }
+      if (c.construction_id && c.construction_name) {
+        if (filterMode === "include" ? filteredConstructions2.has(c.construction_id) : !filteredConstructions2.has(c.construction_id))
+          constructions.set(c.construction_id, c.construction_name);
+      }
       if (c.set_id && c.set_name) sets.set(c.set_id, c.set_name);
     }
     return {
@@ -215,7 +243,7 @@ export default function ChessboardReport() {
       construction: Array.from(constructions.entries()).sort((a, b) => a[1].localeCompare(b[1], "ru")),
       set: Array.from(sets.entries()).sort((a, b) => a[1].localeCompare(b[1], "ru")),
     };
-  }, [cells, excludedWorkTypes, excludedConstructions]);
+  }, [cells, filterMode, filteredWorkTypes2, filteredConstructions2]);
 
   // Сохранение фильтров в sessionStorage
   useEffect(() => {
@@ -248,14 +276,22 @@ export default function ChessboardReport() {
     setFilters({ building: new Set(), workType: new Set(), construction: new Set(), set: new Set() });
   }
 
-  // Фильтрация ячеек — только с этажом, исключая связанные с фасадами/благоустройством
+  // Фильтрация ячеек
   const filtered = useMemo(() => {
     return cells.filter((c) => {
       if (!c.floor_id) return false;
-      // Исключить виды работ, уровни и конструкции подложек фасадов/благоустройства
-      if (c.work_type_id && excludedWorkTypes.has(c.work_type_id)) return false;
-      if (c.floor_id && excludedFloors.has(c.floor_id)) return false;
-      if (c.construction_id && excludedConstructions.has(c.construction_id)) return false;
+      if (filterMode === "include") {
+        // Режим зоны: показать только ячейки, связанные с подложками зоны
+        const wtOk = filteredWorkTypes2.size === 0 || (c.work_type_id && filteredWorkTypes2.has(c.work_type_id));
+        const flOk = filteredFloors2.size === 0 || (c.floor_id && filteredFloors2.has(c.floor_id));
+        const cnOk = filteredConstructions2.size === 0 || (c.construction_id && filteredConstructions2.has(c.construction_id));
+        if (!wtOk && !flOk && !cnOk) return false;
+      } else {
+        // Обычная шахматка: исключить данные других зон
+        if (c.work_type_id && filteredWorkTypes2.has(c.work_type_id)) return false;
+        if (c.floor_id && filteredFloors2.has(c.floor_id)) return false;
+        if (c.construction_id && filteredConstructions2.has(c.construction_id)) return false;
+      }
       // Пользовательские фильтры
       if (filters.building.size > 0 && (!c.building_id || !filters.building.has(c.building_id))) return false;
       if (filters.workType.size > 0 && (!c.work_type_id || !filters.workType.has(c.work_type_id))) return false;
@@ -263,7 +299,7 @@ export default function ChessboardReport() {
       if (filters.set.size > 0 && (!c.set_id || !filters.set.has(c.set_id))) return false;
       return true;
     });
-  }, [cells, filters, excludedWorkTypes, excludedFloors, excludedConstructions]);
+  }, [cells, filters, filterMode, filteredWorkTypes2, filteredFloors2, filteredConstructions2]);
 
   // Построение матрицы
   const matrix = useMemo(() => {
@@ -279,9 +315,12 @@ export default function ChessboardReport() {
     } else {
       const maxSort = Math.max(...usedFloorSorts);
       // Все этажи справочника от самого нижнего до максимального заполненного
-      // (исключая этажи подложек фасадов/благоустройства)
       floors = allFloors
-        .filter((f) => f.sort <= maxSort && !excludedFloors.has(f.id))
+        .filter((f) => {
+          if (f.sort > maxSort) return false;
+          if (filterMode === "include") return filteredFloors2.size === 0 || filteredFloors2.has(f.id);
+          return !filteredFloors2.has(f.id);
+        })
         .sort((a, b) => b.sort - a.sort);
     }
 
@@ -333,7 +372,7 @@ export default function ChessboardReport() {
     }
 
     return { floors, columns, grid };
-  }, [filtered, allFloors, excludedFloors]);
+  }, [filtered, allFloors, filterMode, filteredFloors2]);
 
   function handlePrint() {
     window.print();

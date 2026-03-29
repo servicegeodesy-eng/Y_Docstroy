@@ -11,6 +11,7 @@ import { useDictLinks } from "@/hooks/useDictLinks";
 import { useProject } from "@/lib/ProjectContext";
 import { supabase } from "@/lib/supabase";
 import PlanCanvas from "@/components/plan/PlanCanvas";
+import ChessboardReport from "@/pages/workspace/ChessboardReport";
 
 import CellDetailModal from "@/components/registry/CellDetailModal";
 import RequestDetailModal from "@/components/requests/RequestDetailModal";
@@ -121,6 +122,7 @@ export default function PlanPage({ mode = "plan" }: Props) {
   const [selConstruction, setSelConstruction] = useState(() => loadSaved(mode).construction);
   const [selOverlay, setSelOverlay] = useState(() => loadSaved(mode).overlay);
   const [selWork, setSelWork] = useState("");
+  const [viewMode, setViewMode] = useState<"overlay" | "chessboard">("overlay");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [detailCellId, setDetailCellId] = useState<string | null>(null);
   const [detailRequestId, setDetailRequestId] = useState<string | null>(null);
@@ -451,6 +453,37 @@ export default function PlanPage({ mode = "plan" }: Props) {
           <h2 className={`font-semibold ${isMobile ? "text-lg" : "text-xl"}`} style={{ color: "var(--ds-text)" }}>{title}</h2>
         </div>
         <div className="flex items-center gap-2" data-print-hide>
+          {CONSTRUCTION_MODES.has(mode) && (
+            <div className="flex rounded-lg border overflow-hidden" style={{ borderColor: "var(--ds-border)" }}>
+              <button
+                onClick={() => setViewMode("overlay")}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors"
+                style={viewMode === "overlay"
+                  ? { background: "color-mix(in srgb, var(--ds-accent) 15%, var(--ds-surface))", color: "var(--ds-accent)" }
+                  : { color: "var(--ds-text-muted)" }}
+                title="Подложка"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                </svg>
+                {!isMobile && "Подложка"}
+              </button>
+              <div className="w-px" style={{ background: "var(--ds-border)" }} />
+              <button
+                onClick={() => setViewMode("chessboard")}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors"
+                style={viewMode === "chessboard"
+                  ? { background: "color-mix(in srgb, var(--ds-accent) 15%, var(--ds-surface))", color: "var(--ds-accent)" }
+                  : { color: "var(--ds-text-muted)" }}
+                title="Шахматка"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                </svg>
+                {!isMobile && "Шахматка"}
+              </button>
+            </div>
+          )}
           {hasPermission("can_print") && !isMobile && (
             <button
               onClick={() => window.print()}
@@ -465,6 +498,11 @@ export default function PlanPage({ mode = "plan" }: Props) {
         </div>
       </div>
 
+      {/* Шахматка — режим зоны */}
+      {viewMode === "chessboard" && CONSTRUCTION_MODES.has(mode) ? (
+        <ChessboardReport zoneMode={mode} />
+      ) : (
+      <>
       {/* Фильтры — стиль шахматки */}
       <div className={`ds-card ${isMobile ? "p-2" : "p-3"} space-y-2`} data-print-hide>
         <div className={`flex items-center gap-2 flex-wrap ${isMobile ? "gap-1.5" : ""}`} ref={filterRef}>
@@ -580,6 +618,9 @@ export default function PlanPage({ mode = "plan" }: Props) {
               : statuses.map((s) => ({ name: s.name, colorKey: s.color_key }))}
           />
         </div>
+      )}
+
+      </>
       )}
 
       {/* Модал деталей ячейки */}
