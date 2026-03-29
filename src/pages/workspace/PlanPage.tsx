@@ -17,7 +17,7 @@ import ChessboardReport from "@/pages/workspace/ChessboardReport";
 
 import CellDetailModal from "@/components/registry/CellDetailModal";
 import RequestDetailModal from "@/components/requests/RequestDetailModal";
-import WorkProcessModal from "@/components/installation/WorkProcessModal";
+import WorkDetailModal from "@/components/installation/WorkDetailModal";
 import type { InstallationWork } from "@/components/installation/WorkCard";
 import type { LinkMap } from "@/hooks/useDictLinks";
 import type { Overlay } from "@/types";
@@ -687,8 +687,8 @@ export default function PlanPage({ mode = "plan" }: Props) {
 
       {/* Модал деталей работы монтажа */}
       {detailWork && (
-        <WorkProcessModal
-          work={detailWork}
+        <WorkDetailModal
+          workId={detailWork.id}
           onClose={() => { setDetailWorkId(null); setDetailWork(null); }}
           onUpdated={() => { setDetailWorkId(null); setDetailWork(null); loadWorkMasks(); }}
         />

@@ -3,7 +3,7 @@ import { api } from "@/lib/api";
 import { useProject } from "@/lib/ProjectContext";
 import { useMobile } from "@/lib/MobileContext";
 import CreateWorkModal from "@/components/installation/CreateWorkModal";
-import WorkProcessModal from "@/components/installation/WorkProcessModal";
+import WorkDetailModal from "@/components/installation/WorkDetailModal";
 import type { InstallationWork, WorkMaterial } from "@/components/installation/WorkCard";
 
 type Tab = "planned" | "in_progress";
@@ -360,8 +360,8 @@ export default function InstallationPage() {
         />
       )}
       {selectedWork && (
-        <WorkProcessModal
-          work={selectedWork}
+        <WorkDetailModal
+          workId={selectedWork.id}
           onClose={() => setSelectedWork(null)}
           onUpdated={handleWorkUpdated}
         />
