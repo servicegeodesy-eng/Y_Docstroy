@@ -362,10 +362,22 @@ export default function CreateOrderModal({ onClose, onCreated, editOrder }: Prop
                   </button>
                 </span>
               ))}
-              <label className="ds-btn-secondary text-xs px-3 py-1.5 cursor-pointer inline-flex items-center">
+              <button
+                type="button"
+                className="ds-btn-secondary text-xs px-3 py-1.5"
+                onClick={() => {
+                  const input = document.createElement("input");
+                  input.type = "file";
+                  input.multiple = true;
+                  input.onchange = (e) => {
+                    const target = e.target as HTMLInputElement;
+                    if (target.files) setFiles((prev) => [...prev, ...Array.from(target.files!)]);
+                  };
+                  input.click();
+                }}
+              >
                 + Добавить файл
-                <input type="file" style={{ position: "absolute", width: 0, height: 0, opacity: 0, overflow: "hidden" }} multiple onChange={handleFileChange} />
-              </label>
+              </button>
             </div>
           </div>
 
