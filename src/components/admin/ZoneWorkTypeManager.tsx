@@ -96,23 +96,29 @@ export default function ZoneWorkTypeManager({ onBack }: Props) {
     if (!project || !activeZone) return;
     setSaving(true);
 
-    await supabase
+    // Удалить старые связи
+    const { error: delErr } = await supabase
       .from("dict_zone_work_types")
       .delete()
       .eq("project_id", project.id)
       .eq("zone_type", activeZone);
 
+    if (delErr) console.error("zone delete error:", delErr);
+
+    // Вставить выбранные
     const ids = Array.from(links.get(activeZone) || []);
     if (ids.length > 0) {
-      await supabase.from("dict_zone_work_types").insert(
+      const { error: insErr } = await supabase.from("dict_zone_work_types").insert(
         ids.map((wtId) => ({
           project_id: project.id,
           zone_type: activeZone,
           work_type_id: wtId,
         })),
       );
+      if (insErr) console.error("zone insert error:", insErr);
     }
     setSaving(false);
+    setActiveZone(null);
   }
 
   if (loading) {
