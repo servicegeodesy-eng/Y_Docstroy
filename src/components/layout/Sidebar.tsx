@@ -356,7 +356,7 @@ export default function Sidebar({ isAdmin, mobileMode, onNavigate }: SidebarProp
             onClick={handleLinkClick}
           >
             {constructionItem.icon}
-            {!isCollapsed && <span className="truncate">{constructionItem.label}</span>}
+            {!isCollapsed && <span className="leading-tight">Процесс<br/>строительства</span>}
           </NavLink>
         )}
 
