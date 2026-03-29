@@ -42,10 +42,32 @@ export default function MaterialsPage() {
   const loadOrders = useCallback(async () => {
     if (!project) return;
     setLoading(true);
-    const res = await api.get<MaterialOrder[]>("/api/materials/orders", {
+    const res = await api.get<Record<string, unknown>[]>("/api/materials/orders", {
       project_id: project.id,
     });
-    if (res.data) setOrders(res.data);
+    if (res.data) {
+      // Маппинг API → фронтенд типы
+      const mapped: MaterialOrder[] = res.data.map((o: Record<string, unknown>) => ({
+        id: o.id as string,
+        order_number: String(o.order_number || ""),
+        status: (o.status || "draft") as MaterialOrder["status"],
+        building_name: (o.building_name || "") as string,
+        work_type_name: (o.work_type_name || "") as string,
+        floor_name: (o.floor_name || null) as string | null,
+        construction_name: (o.construction_name || null) as string | null,
+        notes: (o.notes || null) as string | null,
+        created_at: (o.created_at || "") as string,
+        created_by_name: [o.last_name, o.first_name].filter(Boolean).join(" ") || "",
+        items: Array.isArray(o.items) ? (o.items as Record<string, unknown>[]).map((it) => ({
+          id: (it.id || "") as string,
+          material_name: (it.material_name || "") as string,
+          unit_name: (it.unit_short || it.unit_name || "") as string,
+          quantity: Number(it.quantity || 0),
+          delivered_quantity: Number(it.delivered_qty ?? it.delivered_quantity ?? 0),
+        })) : [],
+      }));
+      setOrders(mapped);
+    }
     setLoading(false);
   }, [project]);
 
@@ -225,22 +247,115 @@ export default function MaterialsPage() {
    Tab: Заказано
    ============================================================================ */
 
+const STATUS_LABELS: Record<string, string> = {
+  ordered: "Заказано", partial: "Частично", delivered: "Доставлено", draft: "Черновик",
+};
+const STATUS_COLORS: Record<string, string> = {
+  ordered: "#3b82f6", partial: "#f59e0b", delivered: "#22c55e", draft: "var(--ds-text-faint)",
+};
+
 function OrderedTab({ orders, onClickOrder }: {
   orders: MaterialOrder[];
   onClickOrder: (o: MaterialOrder) => void;
 }) {
-  const { isMobile } = useMobile();
+  const [showArchive, setShowArchive] = useState(false);
+  const active = orders.filter((o) => o.status !== "delivered");
+  const archived = orders.filter((o) => o.status === "delivered");
 
   if (orders.length === 0) {
     return <EmptyState message="Нет заказов" hint="Нажмите «Заказать» для создания первой заявки на материалы" />;
   }
 
   return (
-    <div className={`grid gap-3 ${isMobile ? "grid-cols-1" : "grid-cols-2 lg:grid-cols-3"}`}>
-      {orders.map((order) => (
-        <OrderCard key={order.id} order={order} onClick={() => onClickOrder(order)} />
-      ))}
+    <div>
+      <div className="ds-card overflow-hidden">
+        <table className="ds-table">
+          <thead>
+            <tr>
+              <th className="w-16">№</th>
+              <th className="w-24">Дата</th>
+              <th>Место / Вид работ</th>
+              <th>Материалы</th>
+              <th className="w-24">Статус</th>
+            </tr>
+          </thead>
+          <tbody>
+            {active.length === 0 && !showArchive ? (
+              <tr><td colSpan={5} className="px-4 py-6 text-center" style={{ color: "var(--ds-text-faint)" }}>Нет активных заказов</td></tr>
+            ) : active.map((order) => (
+              <OrderRow key={order.id} order={order} onClick={() => onClickOrder(order)} />
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {archived.length > 0 && (
+        <div className="mt-3">
+          <button
+            onClick={() => setShowArchive(!showArchive)}
+            className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5"
+            style={{ color: "var(--ds-text-faint)" }}
+          >
+            <svg className={`w-3 h-3 transition-transform ${showArchive ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+            Архив ({archived.length})
+          </button>
+          {showArchive && (
+            <div className="ds-card overflow-hidden mt-1">
+              <table className="ds-table">
+                <tbody>
+                  {archived.map((order) => (
+                    <OrderRow key={order.id} order={order} onClick={() => onClickOrder(order)} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
     </div>
+  );
+}
+
+function OrderRow({ order, onClick }: { order: MaterialOrder; onClick: () => void }) {
+  const location = [order.building_name, order.work_type_name].filter(Boolean).join(" / ");
+  const sub = [order.floor_name, order.construction_name].filter(Boolean).join(" / ");
+  const date = order.created_at ? new Date(order.created_at).toLocaleDateString("ru") : "";
+  const statusColor = STATUS_COLORS[order.status] || "var(--ds-text-faint)";
+
+  return (
+    <tr className="cursor-pointer" onClick={onClick}>
+      <td className="text-sm font-medium" style={{ color: "var(--ds-accent)" }}>#{order.order_number}</td>
+      <td className="text-xs" style={{ color: "var(--ds-text-faint)" }}>{date}</td>
+      <td>
+        <div className="text-sm" style={{ color: "var(--ds-text)" }}>{location}</div>
+        {sub && <div className="text-xs" style={{ color: "var(--ds-text-faint)" }}>{sub}</div>}
+      </td>
+      <td>
+        <div className="flex flex-col gap-0.5">
+          {(order.items || []).map((it, i) => {
+            const pct = it.quantity > 0 ? Math.min(100, (it.delivered_quantity / it.quantity) * 100) : 0;
+            return (
+              <div key={i} className="flex items-center gap-2">
+                <span className="text-xs truncate" style={{ color: "var(--ds-text-muted)", maxWidth: 120 }}>{it.material_name}</span>
+                <div className="flex-1 h-3 rounded-full overflow-hidden" style={{ background: "var(--ds-surface-sunken)", minWidth: 60 }}>
+                  <div className="h-full rounded-full" style={{ width: `${pct}%`, background: pct >= 100 ? "#22c55e" : "#3b82f6" }} />
+                </div>
+                <span className="text-[10px] font-mono whitespace-nowrap" style={{ color: "var(--ds-text-faint)" }}>
+                  {it.delivered_quantity}/{it.quantity}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </td>
+      <td>
+        <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-medium" style={{ background: `color-mix(in srgb, ${statusColor} 15%, transparent)`, color: statusColor }}>
+          {STATUS_LABELS[order.status] || order.status}
+        </span>
+      </td>
+    </tr>
   );
 }
 
