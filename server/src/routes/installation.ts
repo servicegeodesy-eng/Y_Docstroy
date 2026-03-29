@@ -471,13 +471,13 @@ router.get('/zone-counts', async (req: AuthRequest, res: Response) => {
     if (!projectId) { res.status(400).json({ error: 'project_id обязателен' }); return; }
 
     const result = await pool.query(
-      `SELECT do.tab_type, count(DISTINCT iw.id)::int as work_count
+      `SELECT ov.tab_type, count(DISTINCT iw.id)::int as work_count
        FROM cell_overlay_masks m
        JOIN installation_works iw ON iw.id = m.work_id
-       JOIN dict_overlays do ON do.id = m.overlay_id
+       JOIN dict_overlays ov ON ov.id = m.overlay_id
        WHERE iw.project_id = $1 AND iw.status IN ('planned', 'in_progress')
-         AND do.tab_type IS NOT NULL
-       GROUP BY do.tab_type`,
+         AND ov.tab_type IS NOT NULL
+       GROUP BY ov.tab_type`,
       [projectId]
     );
 
