@@ -74,7 +74,7 @@ export default function WorkDetailModal({ workId, onClose, onUpdated }: Props) {
     setActionLoading(true);
     await api.post(`/api/installation/works/${workId}/start`, {});
     setActionLoading(false);
-    loadWork(); onUpdated();
+    loadWork();
   }
 
   async function handleUseMaterial(matId: string) {

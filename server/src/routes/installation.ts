@@ -89,7 +89,10 @@ router.get('/works', async (req: AuthRequest, res: Response) => {
       WHERE iw.project_id = $1`;
     const params: unknown[] = [projectId];
 
-    if (status) { sql += ` AND iw.status = $2`; params.push(status); }
+    let paramIdx = 2;
+    if (status) { sql += ` AND iw.status = $${paramIdx++}`; params.push(status); }
+    const createdBy = req.query.created_by as string;
+    if (createdBy) { sql += ` AND iw.created_by = $${paramIdx++}`; params.push(createdBy); }
     sql += ` ORDER BY iw.created_at DESC`;
 
     const result = await pool.query(sql, params);
