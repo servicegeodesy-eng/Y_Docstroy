@@ -10,11 +10,15 @@ import { useProjectStatuses } from "@/hooks/useProjectStatuses";
 import { useDictLinks } from "@/hooks/useDictLinks";
 import { useProject } from "@/lib/ProjectContext";
 import { supabase } from "@/lib/supabase";
+import { api } from "@/lib/api";
 import PlanCanvas from "@/components/plan/PlanCanvas";
+import type { WorkMaskData } from "@/components/plan/PlanCanvas";
 import ChessboardReport from "@/pages/workspace/ChessboardReport";
 
 import CellDetailModal from "@/components/registry/CellDetailModal";
 import RequestDetailModal from "@/components/requests/RequestDetailModal";
+import WorkProcessModal from "@/components/installation/WorkProcessModal";
+import type { InstallationWork } from "@/components/installation/WorkCard";
 import type { LinkMap } from "@/hooks/useDictLinks";
 import type { Overlay } from "@/types";
 import type { MaskWithCell } from "@/hooks/useCellMasks";
@@ -127,6 +131,8 @@ export default function PlanPage({ mode = "plan" }: Props) {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [detailCellId, setDetailCellId] = useState<string | null>(null);
   const [detailRequestId, setDetailRequestId] = useState<string | null>(null);
+  const [detailWorkId, setDetailWorkId] = useState<string | null>(null);
+  const [detailWork, setDetailWork] = useState<InstallationWork | null>(null);
   const prevMode = useRef(mode);
 
   const canViewRequests = hasPermission("can_view_requests");
@@ -181,6 +187,28 @@ export default function PlanPage({ mode = "plan" }: Props) {
   useEffect(() => {
     loadRequestMasks();
   }, [loadRequestMasks]);
+
+  // Маски работ монтажа — загружаются для текущей подложки
+  const [workMasks, setWorkMasks] = useState<WorkMaskData[]>([]);
+
+  const loadWorkMasks = useCallback(async () => {
+    if (!selOverlay) { setWorkMasks([]); return; }
+    const res = await api.get<WorkMaskData[]>("/api/installation/masks", { overlay_id: selOverlay });
+    if (res.data) setWorkMasks(res.data);
+    else setWorkMasks([]);
+  }, [selOverlay]);
+
+  useEffect(() => {
+    loadWorkMasks();
+  }, [loadWorkMasks]);
+
+  // Load work detail when clicking a work mask
+  useEffect(() => {
+    if (!detailWorkId) { setDetailWork(null); return; }
+    api.get<InstallationWork>(`/api/installation/works/${detailWorkId}`).then((res) => {
+      if (res.data) setDetailWork(res.data);
+    });
+  }, [detailWorkId]);
 
   useEffect(() => {
     loadDicts();
@@ -623,9 +651,11 @@ export default function PlanPage({ mode = "plan" }: Props) {
             imageHeight={selectedOverlay?.height || 750}
             masks={selWork ? [] : filteredMasks}
             requestMasks={selWork ? requestMasks : []}
+            workMasks={workMasks}
             getColorKey={getColorKey}
             onMaskClick={(cellId) => setDetailCellId(cellId)}
             onRequestMaskClick={(cellId) => setDetailRequestId(cellId)}
+            onWorkMaskClick={(workId) => setDetailWorkId(workId)}
             legend={selWork
               ? [{ name: "Заявки", colorKey: "orange" }]
               : statuses.map((s) => ({ name: s.name, colorKey: s.color_key }))}
@@ -652,6 +682,15 @@ export default function PlanPage({ mode = "plan" }: Props) {
           onClose={() => setDetailRequestId(null)}
           onUpdated={() => loadRequestMasks()}
           onAcknowledged={() => {}}
+        />
+      )}
+
+      {/* Модал деталей работы монтажа */}
+      {detailWork && (
+        <WorkProcessModal
+          work={detailWork}
+          onClose={() => { setDetailWorkId(null); setDetailWork(null); }}
+          onUpdated={() => { setDetailWorkId(null); setDetailWork(null); loadWorkMasks(); }}
         />
       )}
     </div>

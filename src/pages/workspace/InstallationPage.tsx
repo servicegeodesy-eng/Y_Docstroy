@@ -4,6 +4,7 @@ import { useProject } from "@/lib/ProjectContext";
 import { useMobile } from "@/lib/MobileContext";
 import CreateWorkModal from "@/components/installation/CreateWorkModal";
 import WorkProcessModal from "@/components/installation/WorkProcessModal";
+import WorkOverlayView from "@/components/installation/WorkOverlayView";
 import type { InstallationWork, WorkMaterial } from "@/components/installation/WorkCard";
 
 type Tab = "planned" | "in_progress";
@@ -133,6 +134,7 @@ export default function InstallationPage() {
   const { project } = useProject();
   const { isMobile } = useMobile();
   const [activeTab, setActiveTab] = useState<Tab>("planned");
+  const [viewMode, setViewMode] = useState<"table" | "map">("table");
 
   // Data
   const [works, setWorks] = useState<InstallationWork[]>([]);
@@ -208,16 +210,60 @@ export default function InstallationPage() {
             </span>
           )}
         </div>
-        <button
-          className="ds-btn text-sm flex items-center gap-1.5"
-          onClick={() => setShowCreate(true)}
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          {!isMobile && "Новые работы"}
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Table / Map toggle */}
+          <div className="flex rounded-lg border overflow-hidden" style={{ borderColor: "var(--ds-border)" }}>
+            <button
+              onClick={() => setViewMode("table")}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors"
+              style={viewMode === "table"
+                ? { background: "color-mix(in srgb, var(--ds-accent) 15%, var(--ds-surface))", color: "var(--ds-accent)" }
+                : { color: "var(--ds-text-muted)" }}
+              title="Таблица"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+              </svg>
+              {!isMobile && "Таблица"}
+            </button>
+            <div className="w-px" style={{ background: "var(--ds-border)" }} />
+            <button
+              onClick={() => setViewMode("map")}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors"
+              style={viewMode === "map"
+                ? { background: "color-mix(in srgb, var(--ds-accent) 15%, var(--ds-surface))", color: "var(--ds-accent)" }
+                : { color: "var(--ds-text-muted)" }}
+              title="Карта"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+              </svg>
+              {!isMobile && "Карта"}
+            </button>
+          </div>
+
+          <button
+            className="ds-btn text-sm flex items-center gap-1.5"
+            onClick={() => setShowCreate(true)}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            {!isMobile && "Новые работы"}
+          </button>
+        </div>
       </div>
+
+      {/* Map view */}
+      {viewMode === "map" ? (
+        <WorkOverlayView
+          onWorkClick={(workId) => {
+            const w = works.find((x) => x.id === workId);
+            if (w) setSelectedWork(w);
+          }}
+        />
+      ) : (
+      <>
 
       {/* Tabs */}
       <div className="flex gap-1 rounded-lg p-1 w-fit mb-4" style={{ background: "var(--ds-surface-sunken)" }}>
@@ -345,6 +391,9 @@ export default function InstallationPage() {
             </div>
           )}
         </div>
+      )}
+
+      </>
       )}
 
       {/* Modals */}

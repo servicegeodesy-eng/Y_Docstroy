@@ -8,15 +8,28 @@ interface LegendItem {
   colorKey: string;
 }
 
+export interface WorkMaskData {
+  id: string;
+  work_id: string;
+  polygon_points: { x: number; y: number }[];
+  work_status: string;
+  progress: number;
+  planned_date: string | null;
+  building_name: string | null;
+  work_type_name: string | null;
+}
+
 interface Props {
   imageUrl: string;
   imageWidth: number;
   imageHeight: number;
   masks: MaskWithCell[];
   requestMasks?: MaskWithCell[];
+  workMasks?: WorkMaskData[];
   getColorKey: (status: string) => string;
   onMaskClick: (cellId: string) => void;
   onRequestMaskClick?: (cellId: string) => void;
+  onWorkMaskClick?: (workId: string) => void;
   legend?: LegendItem[];
 }
 
@@ -197,20 +210,50 @@ function layoutLegend(items: LegendItem[], maxWidth: number) {
   return { rows, totalH };
 }
 
+/** Заливка маски работы по прогрессу */
+function workMaskFill(status: string, progress: number): string {
+  if (status === "completed") return "rgba(34,197,94,0.3)";
+  if (status === "planned") return "rgba(59,130,246,0.08)";
+  const t = Math.max(0, Math.min(100, progress)) / 100;
+  const r = Math.round(249 * (1 - t) + 34 * t);
+  const g = Math.round(115 * (1 - t) + 197 * t);
+  const b = Math.round(22 * (1 - t) + 94 * t);
+  return `rgba(${r},${g},${b},${0.15 + t * 0.2})`;
+}
+
+function workMaskStroke(status: string, progress: number): string {
+  if (status === "completed") return "#22c55e";
+  if (status === "planned") return "#3b82f6";
+  const t = Math.max(0, Math.min(100, progress)) / 100;
+  const r = Math.round(249 * (1 - t) + 34 * t);
+  const g = Math.round(115 * (1 - t) + 197 * t);
+  const b = Math.round(22 * (1 - t) + 94 * t);
+  return `rgb(${r},${g},${b})`;
+}
+
+const WORK_STATUS_LABELS: Record<string, string> = {
+  planned: "Запланировано",
+  in_progress: "В процессе",
+  completed: "Завершено",
+};
+
 export default function PlanCanvas({
   imageUrl,
   imageWidth,
   imageHeight,
   masks,
   requestMasks = [],
+  workMasks = [],
   getColorKey,
   onMaskClick,
   onRequestMaskClick,
+  onWorkMaskClick,
   legend,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [hoveredMask, setHoveredMask] = useState<string | null>(null);
   const [tooltip, setTooltip] = useState<{ x: number; y: number; mask: MaskWithCell } | null>(null);
+  const [workTooltip, setWorkTooltip] = useState<{ x: number; y: number; mask: WorkMaskData } | null>(null);
 
   const aspectW = 1000;
   const imageAspectH = imageHeight > 0 ? (1000 * imageHeight) / imageWidth : 750;
@@ -307,7 +350,19 @@ export default function PlanCanvas({
   const handleMouseLeave = useCallback(() => {
     setHoveredMask(null);
     setTooltip(null);
+    setWorkTooltip(null);
   }, []);
+
+  const handleWorkMouseEnter = useCallback(
+    (mask: WorkMaskData, e: React.MouseEvent) => {
+      setHoveredMask(`work-${mask.id}`);
+      const svg = svgRef.current;
+      if (!svg) return;
+      const rect = svg.getBoundingClientRect();
+      setWorkTooltip({ x: e.clientX - rect.left, y: e.clientY - rect.top, mask });
+    },
+    [],
+  );
 
   return (
     <div className="relative">
@@ -390,6 +445,41 @@ export default function PlanCanvas({
           );
         })}
 
+        {/* Маски работ монтажа */}
+        {workMasks.map((mask) => {
+          const isHovered = hoveredMask === `work-${mask.id}`;
+          const fill = workMaskFill(mask.work_status, mask.progress);
+          const stroke = workMaskStroke(mask.work_status, mask.progress);
+          const isDashed = mask.work_status === "planned";
+          const center = centroid(mask.polygon_points);
+
+          return (
+            <g key={`work-${mask.id}`}>
+              <polygon
+                points={mask.polygon_points.map(displayPoint).join(" ")}
+                fill={fill}
+                stroke={stroke}
+                strokeWidth={isHovered ? "3" : "2"}
+                strokeDasharray={isDashed ? "8 4" : undefined}
+                opacity={isHovered ? 0.95 : 0.8}
+                className="cursor-pointer transition-opacity"
+                onClick={() => onWorkMaskClick?.(mask.work_id)}
+                onMouseEnter={(e) => handleWorkMouseEnter(mask, e)}
+                onMouseLeave={handleMouseLeave}
+              />
+              <text
+                x={center.x * aspectW}
+                y={center.y * imageAspectH}
+                textAnchor="middle" dominantBaseline="central"
+                fontSize={11} fontWeight="700" fill={stroke}
+                className="pointer-events-none select-none"
+              >
+                {mask.progress}%
+              </text>
+            </g>
+          );
+        })}
+
         {/* Легенда статусов (внутри SVG — видна при печати) */}
         {legendLayout && legend && (
           <g className="pointer-events-none select-none">
@@ -433,6 +523,34 @@ export default function PlanCanvas({
             <p className="" style={{ color: "var(--ds-text-muted)" }}>Прогресс: {tooltip.mask.cell_progress_percent}%</p>
           )}
           <p className="mt-0.5" style={{ color: "var(--ds-text-faint)" }}>{shortDate(tooltip.mask.cell_updated_at)}</p>
+        </div>
+      )}
+
+      {/* Тултип работы монтажа */}
+      {workTooltip && (
+        <div
+          className="absolute pointer-events-none z-10 rounded-lg shadow-lg px-3 py-2 text-xs max-w-[240px]"
+          style={{
+            background: "var(--ds-surface)",
+            border: "1px solid var(--ds-border)",
+            left: Math.min(workTooltip.x + 12, (svgRef.current?.getBoundingClientRect().width || 600) - 250),
+            top: workTooltip.y + 12,
+          }}
+        >
+          <p className="font-medium" style={{ color: "var(--ds-text)" }}>
+            {[workTooltip.mask.building_name, workTooltip.mask.work_type_name].filter(Boolean).join(" / ") || "Монтаж"}
+          </p>
+          <div className="mt-1 flex items-center gap-2">
+            <span className="text-[10px] font-medium" style={{ color: workMaskStroke(workTooltip.mask.work_status, workTooltip.mask.progress) }}>
+              {WORK_STATUS_LABELS[workTooltip.mask.work_status] || workTooltip.mask.work_status}
+            </span>
+            <span style={{ color: "var(--ds-text)" }}>Прогресс: {workTooltip.mask.progress}%</span>
+          </div>
+          {workTooltip.mask.planned_date && (
+            <p className="mt-0.5" style={{ color: "var(--ds-text-faint)" }}>
+              План: {shortDate(workTooltip.mask.planned_date)}
+            </p>
+          )}
         </div>
       )}
     </div>
