@@ -234,7 +234,8 @@ export default function ConstructionMapPage() {
   const ShoringTop = GL + 6; // starts just below ground
   const FoundH = 22; // foundation height (inside shoring)
   const PitH = 28; // narrow pit space below foundation
-  const ShoringBottom = ShoringTop + FoundH + PitH; // shoring ends at pit bottom
+  const PitBottom = ShoringTop + FoundH + PitH;
+  const ShoringBottom = PitBottom + 40; // shoring walls extend below pit
   const PitTop = ShoringTop + FoundH; // pit starts below foundation
   // Piles — from foundation bottom, through pit, deep into earth
   const PileLen = 130; // total pile length
@@ -332,9 +333,9 @@ export default function ConstructionMapPage() {
             const mid = (RoofLeft + RoofRight) / 2;
             return <line key={`rt-${t}`} x1={RoofLeft + (mid - RoofLeft) * (1 - t) + 10} y1={ly} x2={RoofRight - (RoofRight - mid) * (1 - t) - 10} y2={ly} stroke={dk ? "#4a6888" : "#4a6888"} strokeWidth="0.6" opacity="0.4" />;
           })}
-          {/* Label top-right */}
+          {/* Label top-right — line reaches roof slope */}
           <FramedLabel x={RoofRight + 36} y={8} text="Кровля" dk={dk} id="roof" hovered={hovered}
-            lineFromX={RoofRight - 50} lineFromY={RoofPeak + 12} />
+            lineFromX={(RoofLeft + RoofRight) / 2 + 60} lineFromY={RoofPeak + (BY - RoofPeak) * 0.35} />
         </g>
 
         {/* ====== EARTHWORK — sand pile on surface ====== */}
@@ -398,9 +399,9 @@ export default function ConstructionMapPage() {
         <g {...zoneProps("foundation")}>
           <rect x={ShoringLeft + SheetW} y={ShoringTop} width={ShoringRight - ShoringLeft - SheetW * 2} height={FoundH}
             fill={p("pat-concrete", "pat-concrete-dk")} stroke={dk ? "#5a7a90" : "#7a8a9a"} strokeWidth="1.5" />
-          {/* Label right side, below shoring label */}
-          <FramedLabel x={ShoringRight + 30} y={ShoringTop + 56} text="Основание" dk={dk} id="foundation" hovered={hovered}
-            lineFromX={ShoringRight - SheetW - 20} lineFromY={ShoringTop + FoundH / 2} />
+          {/* Label left side */}
+          <FramedLabel x={4} y={GL + 56} text="Основание" dk={dk} id="foundation" hovered={hovered}
+            lineFromX={ShoringLeft + SheetW + 30} lineFromY={ShoringTop + FoundH / 2} />
         </g>
 
         {/* ====== PILES (сваи) — from foundation bottom, through pit, deep into earth ====== */}
