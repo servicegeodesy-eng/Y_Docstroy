@@ -21,6 +21,7 @@ const FileSharePage = lazy(() => import("./pages/workspace/FileSharePage"));
 const StructurePage = lazy(() => import("./pages/workspace/StructurePage"));
 const ConstructionMapPage = lazy(() => import("./pages/workspace/ConstructionMapPage"));
 const InstallPage = lazy(() => import("./pages/InstallPage"));
+const InvitePage = lazy(() => import("./pages/InvitePage"));
 const LandingPage = lazy(() => import("./pages/LandingPage"));
 
 
@@ -130,6 +131,7 @@ export default function App() {
           {geo && <Route path="*" element={<GeoFallback />} />}
         </Route>
         <Route path="/install" element={<InstallPage />} />
+        <Route path="/invite/:code" element={<InvitePage />} />
         <Route path="/" element={<LandingPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

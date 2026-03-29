@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { api } from "@/lib/api";
 import { useProject } from "@/lib/ProjectContext";
 import type { Profile, ProjectRoleType } from "@/types";
 import { PROJECT_ROLES, ROLES } from "@/types";
@@ -26,6 +27,7 @@ export default function ProjectUsersTab() {
   const [saving, setSaving] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editRole, setEditRole] = useState<ProjectRoleType | "">("");
+  const [resettingPw, setResettingPw] = useState<string | null>(null);
 
   useEffect(() => {
     if (!project) return;
@@ -83,6 +85,20 @@ export default function ProjectUsersTab() {
     setEditingId(null);
     await loadData();
     setSaving(null);
+  }
+
+  async function resetPassword(userId: string) {
+    if (!confirm("Сбросить пароль пользователя? Будет создан временный пароль.")) return;
+    setResettingPw(userId);
+    const { data, error } = await api.post<{ temp_password: string }>("/api/invites/reset-password", {
+      target_user_id: userId,
+    });
+    if (error) {
+      alert("Ошибка: " + error);
+    } else if (data?.temp_password) {
+      alert("Временный пароль: " + data.temp_password);
+    }
+    setResettingPw(null);
   }
 
   function fullName(p: Profile | null) {
@@ -159,35 +175,45 @@ export default function ProjectUsersTab() {
                   </td>
 
                   <td className="text-center whitespace-nowrap">
-                    {!isAdmin && (
-                      <div className="flex items-center justify-center gap-1.5">
-                        {isEditing ? (
-                          <>
+                    <div className="flex items-center justify-center gap-1.5">
+                      {!isAdmin && (
+                        <>
+                          {isEditing ? (
+                            <>
+                              <button
+                                onClick={() => saveEdit(m)}
+                                disabled={isBusy}
+                                className="ds-btn px-2 py-1 text-xs"
+                              >
+                                OK
+                              </button>
+                              <button
+                                onClick={() => setEditingId(null)}
+                                className="ds-btn-secondary px-2 py-1 text-xs"
+                              >
+                                Отмена
+                              </button>
+                            </>
+                          ) : (
                             <button
-                              onClick={() => saveEdit(m)}
-                              disabled={isBusy}
-                              className="ds-btn px-2 py-1 text-xs"
+                              onClick={() => startEdit(m)}
+                              className="px-3 py-1 text-xs rounded font-medium transition-colors"
+                              style={{ color: "var(--ds-accent)", background: "color-mix(in srgb, var(--ds-accent) 10%, var(--ds-surface))" }}
                             >
-                              OK
+                              Назначить роль
                             </button>
-                            <button
-                              onClick={() => setEditingId(null)}
-                              className="ds-btn-secondary px-2 py-1 text-xs"
-                            >
-                              Отмена
-                            </button>
-                          </>
-                        ) : (
-                          <button
-                            onClick={() => startEdit(m)}
-                            className="px-3 py-1 text-xs rounded font-medium transition-colors"
-                            style={{ color: "var(--ds-accent)", background: "color-mix(in srgb, var(--ds-accent) 10%, var(--ds-surface))" }}
-                          >
-                            Назначить роль
-                          </button>
-                        )}
-                      </div>
-                    )}
+                          )}
+                        </>
+                      )}
+                      <button
+                        onClick={() => resetPassword(m.userId)}
+                        disabled={resettingPw === m.userId}
+                        className="px-3 py-1 text-xs rounded font-medium transition-colors"
+                        style={{ color: "var(--ds-text-muted)", background: "color-mix(in srgb, var(--ds-text-muted) 10%, var(--ds-surface))" }}
+                      >
+                        {resettingPw === m.userId ? "..." : "Сбросить пароль"}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );

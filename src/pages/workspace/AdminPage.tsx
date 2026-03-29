@@ -6,6 +6,7 @@ import DictionaryManager from "@/components/admin/DictionaryManager";
 import ProjectAccessTab from "@/components/admin/ProjectAccessTab";
 import ProjectUsersTab from "@/components/admin/ProjectUsersTab";
 import ProjectHistoryTab from "@/components/admin/ProjectHistoryTab";
+import InviteManager from "@/components/admin/InviteManager";
 
 interface TabDef {
   key: string;
@@ -25,6 +26,7 @@ export default function AdminPage() {
   if (isProjectAdmin && !isPortalAdmin) {
     tabs.push({ key: "users", label: "Пользователи проекта" });
   }
+  tabs.push({ key: "invites", label: "Приглашения" });
   tabs.push({ key: "dictionaries", label: "Справочники" });
   tabs.push({ key: "history", label: "История действий" });
 
@@ -103,6 +105,7 @@ export default function AdminPage() {
       {/* Tab Content */}
       {activeTab === "access" && isPortalAdmin && <ProjectAccessTab />}
       {activeTab === "users" && !isPortalAdmin && <ProjectUsersTab />}
+      {activeTab === "invites" && <InviteManager />}
       {activeTab === "dictionaries" && <DictionaryManager />}
       {activeTab === "history" && <ProjectHistoryTab />}
     </div>
