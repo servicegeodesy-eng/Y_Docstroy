@@ -19,7 +19,10 @@
       "Read(//c/Program Files/**)",
       "Bash(nslookup db.jbjnqjedqumzkxcfmeyo.supabase.co)",
       "Bash(rm -f sql/migrate.cjs sql/migrate_data.sh sql/export_as_inserts.sql sql/export_supabase_data.sql)",
-      "Bash(rm -rf sql/dump)"
+      "Bash(rm -rf sql/dump)",
+      "Bash(node -e \"const webpush = require\\(''web-push''\\); const keys = webpush.generateVAPIDKeys\\(\\); console.log\\(''VAPID_PUBLIC_KEY='' + keys.publicKey\\); console.log\\(''VAPID_PRIVATE_KEY='' + keys.privateKey\\);\")",
+      "Bash(grep -rn \"from ''''.*\\\\.js''''\" src/)",
+      "Bash(find src:*)"
     ],
     "additionalDirectories": [
       "c:\\Users\\usr\\claudeprojects\\tickhonovich\\DocStroy\\src"
