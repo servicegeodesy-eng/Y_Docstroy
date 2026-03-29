@@ -9,6 +9,8 @@ import { getOverlayUrl } from "@/lib/overlayUrlCache";
 import CreateOrderModal from "@/components/materials/CreateOrderModal";
 import PolygonDrawer from "@/components/plan/PolygonDrawer";
 import type { Point } from "@/components/plan/SnapEngine";
+import { useCellMasks } from "@/hooks/useCellMasks";
+import { useProjectStatuses } from "@/hooks/useProjectStatuses";
 
 interface NomenclatureItem { id: string; name: string; unit_id?: string }
 interface UnitItem { id: string; short_name: string; name: string }
@@ -34,6 +36,7 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
   const { buildings, floors, workTypes, constructions } = useDictionaries();
   const { buildingWorkTypes, workTypeConstructions, buildingWorkTypeFloors } = useDictLinks();
   const { overlays, workTypeOverlays, overlayBuildings } = useOverlays();
+  const { getColorKey } = useProjectStatuses();
 
   // Location
   const [selBuilding, setSelBuilding] = useState("");
@@ -43,6 +46,8 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
   const [plannedDate, setPlannedDate] = useState("");
 
   // Overlay & mask
+  const [overlayIdForMasks, setOverlayIdForMasks] = useState<string | null>(null);
+  const { masks: existingCellMasks } = useCellMasks(overlayIdForMasks);
   const [linkedOverlay, setLinkedOverlay] = useState<{ id: string; name: string; width: number; height: number; storage_path: string } | null>(null);
   const [overlayUrl, setOverlayUrl] = useState("");
   const [showOverlayEditor, setShowOverlayEditor] = useState(false);
@@ -96,9 +101,11 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
     });
     if (match) {
       setLinkedOverlay({ id: match.id, name: match.name, width: match.width || 1000, height: match.height || 750, storage_path: match.storage_path });
+      setOverlayIdForMasks(match.id);
       getOverlayUrl(match.storage_path).then(setOverlayUrl);
     } else {
       setLinkedOverlay(null);
+      setOverlayIdForMasks(null);
       setOverlayUrl("");
     }
     setDrawnPolygons([]);
@@ -244,17 +251,18 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
             </button>
           </div>
         </div>
-        <div className="flex-1 min-h-0 overflow-hidden p-4">
+        <div className="flex-1 min-h-0 overflow-hidden">
           <PolygonDrawer
             imageUrl={overlayUrl}
             imageWidth={linkedOverlay.width}
             imageHeight={linkedOverlay.height}
-            existingMasks={[]}
+            existingMasks={existingCellMasks}
             newPolygons={drawnPolygons}
             onRemovePolygon={(index) => setDrawnPolygons(p => p.filter((_, i) => i !== index))}
-            getColorKey={() => "green"}
+            getColorKey={getColorKey}
             onComplete={(points) => setDrawnPolygons(p => [...p, points])}
             onCancel={() => setShowOverlayEditor(false)}
+            fullscreen
           />
         </div>
       </div>
