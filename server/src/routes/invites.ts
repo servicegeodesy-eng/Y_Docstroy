@@ -21,13 +21,23 @@ async function canInvite(userId: string, companyId: string, projectId?: string):
   // Портальный админ может всё
   if (await isPortalAdmin(userId)) return true;
 
-  // Админ/owner компании может приглашать в свою компанию и проекты
+  // Админ/owner компании может приглашать в свою компанию и её проекты
   const companyRole = await pool.query(
     `SELECT role FROM company_members WHERE company_id = $1 AND user_id = $2`,
     [companyId, userId]
   );
   const role = companyRole.rows[0]?.role;
-  if (role === 'owner' || role === 'admin') return true;
+  if (role === 'owner' || role === 'admin') {
+    // Если указан проект — проверяем что он принадлежит этой компании
+    if (projectId) {
+      const projectCheck = await pool.query(
+        `SELECT 1 FROM projects WHERE id = $1 AND company_id = $2`,
+        [projectId, companyId]
+      );
+      if (projectCheck.rows.length === 0) return false;
+    }
+    return true;
+  }
 
   // Админ проекта может приглашать в свой проект
   if (projectId) {
