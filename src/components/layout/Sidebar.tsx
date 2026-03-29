@@ -124,45 +124,16 @@ const explorerItem = {
   ),
 };
 
-// Группа 2: планы и подложки
-const planItems = [
-  {
-    path: "plan",
-    label: "План",
-    icon: (
-      <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-      </svg>
-    ),
-  },
-  {
-    path: "chessboard",
-    label: "Шахматка",
-    icon: (
-      <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-      </svg>
-    ),
-  },
-  {
-    path: "facades",
-    label: "Фасады",
-    icon: (
-      <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-      </svg>
-    ),
-  },
-  {
-    path: "landscaping",
-    label: "Благоустройство",
-    icon: (
-      <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-      </svg>
-    ),
-  },
-];
+// Группа 2: карта процесса строительства (заменяет План / Шахматка / Фасады / Благоустройство)
+const constructionItem = {
+  path: "construction",
+  label: "Процесс строительства",
+  icon: (
+    <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6M9 9h.01M15 9h.01M9 13h.01M15 13h.01" />
+    </svg>
+  ),
+};
 
 const requestItem = {
   path: "requests",
@@ -376,19 +347,18 @@ export default function Sidebar({ isAdmin, mobileMode, onNavigate }: SidebarProp
 
         {!geo && <div className="ds-divider" />}
 
-        {/* План, Шахматка, Фасады, Благоустройство */}
-        {!geo && planItems.map((item) => (
+        {/* Процесс строительства (карта-изображение) */}
+        {!geo && (
           <NavLink
-            key={item.path}
-            to={`/projects/${projectId}/${item.path}`}
+            to={`/projects/${projectId}/${constructionItem.path}`}
             className={linkClass}
-            title={isCollapsed ? item.label : undefined}
+            title={isCollapsed ? constructionItem.label : undefined}
             onClick={handleLinkClick}
           >
-            {item.icon}
-            {!isCollapsed && <span className="truncate">{item.label}</span>}
+            {constructionItem.icon}
+            {!isCollapsed && <span className="truncate">{constructionItem.label}</span>}
           </NavLink>
-        ))}
+        )}
 
         {!geo && isAdmin && (
           <>

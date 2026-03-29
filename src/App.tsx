@@ -19,6 +19,7 @@ const InstructionPage = lazy(() => import("./pages/workspace/InstructionPage"));
 const RequestsPage = lazy(() => import("./pages/workspace/RequestsPage"));
 const FileSharePage = lazy(() => import("./pages/workspace/FileSharePage"));
 const StructurePage = lazy(() => import("./pages/workspace/StructurePage"));
+const ConstructionMapPage = lazy(() => import("./pages/workspace/ConstructionMapPage"));
 const InstallPage = lazy(() => import("./pages/InstallPage"));
 const LandingPage = lazy(() => import("./pages/LandingPage"));
 
@@ -105,6 +106,7 @@ export default function App() {
           <Route index element={<Navigate to={geo ? "requests" : "registry"} replace />} />
           {!geo && <Route path="tasks" element={<TasksPage />} />}
           {!geo && <Route path="registry" element={<RegistryPage />} />}
+          {!geo && <Route path="construction" element={<ConstructionMapPage />} />}
           {!geo && <Route path="plan" element={<PlanPage mode="plan" />} />}
           {!geo && <Route path="chessboard" element={<ChessboardReport />} />}
           {!geo && <Route path="facades" element={<PlanPage mode="facades" />} />}
