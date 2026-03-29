@@ -29,6 +29,13 @@ interface Props {
   onClose: () => void;
   onCreated: () => void;
   editOrder?: MaterialOrder | null;
+  prefill?: {
+    building_id?: string;
+    work_type_id?: string;
+    floor_id?: string;
+    construction_id?: string;
+    items?: { material_name: string; unit_id: string; unit_name: string; quantity: string }[];
+  };
 }
 
 let rowCounter = 0;
@@ -37,18 +44,22 @@ function emptyRow(): OrderItemRow {
   return { key: ++rowCounter, material_name: "", material_id: null, unit_id: "", unit_name: "", quantity: "" };
 }
 
-export default function CreateOrderModal({ onClose, onCreated, editOrder }: Props) {
+export default function CreateOrderModal({ onClose, onCreated, editOrder, prefill }: Props) {
   const { project } = useProject();
   const { isMobile } = useMobile();
   const { buildings, floors, workTypes, constructions } = useDictionaries();
   const { buildingWorkTypes, workTypeConstructions, buildingWorkTypeFloors } = useDictLinks();
 
-  const [selBuilding, setSelBuilding] = useState(editOrder?.building_name ? "" : "");
-  const [selWorkType, setSelWorkType] = useState("");
-  const [selFloor, setSelFloor] = useState("");
-  const [selConstruction, setSelConstruction] = useState("");
+  const [selBuilding, setSelBuilding] = useState(prefill?.building_id || "");
+  const [selWorkType, setSelWorkType] = useState(prefill?.work_type_id || "");
+  const [selFloor, setSelFloor] = useState(prefill?.floor_id || "");
+  const [selConstruction, setSelConstruction] = useState(prefill?.construction_id || "");
 
-  const [items, setItems] = useState<OrderItemRow[]>([emptyRow()]);
+  const [items, setItems] = useState<OrderItemRow[]>(
+    prefill?.items?.length
+      ? prefill.items.map(it => ({ key: ++rowCounter, material_name: it.material_name, material_id: null, unit_id: it.unit_id, unit_name: it.unit_name, quantity: it.quantity }))
+      : [emptyRow()]
+  );
   const [notes, setNotes] = useState(editOrder?.notes || "");
   const [files, setFiles] = useState<File[]>([]);
   const [loading, setLoading] = useState(false);

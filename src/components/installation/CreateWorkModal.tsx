@@ -31,7 +31,7 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
   const { isMobile } = useMobile();
   const { buildings, floors, workTypes, constructions } = useDictionaries();
   const { buildingWorkTypes, workTypeConstructions, buildingWorkTypeFloors } = useDictLinks();
-  const { overlays } = useOverlays();
+  const { overlays, workTypeOverlays, overlayBuildings } = useOverlays();
 
   // Location
   const [selBuilding, setSelBuilding] = useState("");
@@ -80,15 +80,28 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
     });
   }, [project]);
 
-  // Load overlay when location changes
+  // Load overlay when location changes — filter by workType and building links
   useEffect(() => {
-    if (!selBuilding || !selWorkType) { setOverlayId(""); return; }
-    const match = overlays.find((o) => o.id); // TODO: filter by building/workType links
+    if (!selWorkType) { setOverlayId(""); setOverlayUrl(""); return; }
+    // Get overlay IDs linked to selected work type
+    const linkedOverlayIds = workTypeOverlays[selWorkType] || [];
+    // Find first overlay that matches (optionally filter by building too)
+    const match = overlays.find((o) => {
+      if (!linkedOverlayIds.includes(o.id)) return false;
+      if (selBuilding) {
+        const bldIds = overlayBuildings[o.id] || [];
+        if (bldIds.length > 0 && !bldIds.includes(selBuilding)) return false;
+      }
+      return true;
+    });
     if (match) {
       setOverlayId(match.id);
       getOverlayUrl(match.storage_path).then(setOverlayUrl);
+    } else {
+      setOverlayId("");
+      setOverlayUrl("");
     }
-  }, [selBuilding, selWorkType, overlays]);
+  }, [selBuilding, selWorkType, overlays, workTypeOverlays, overlayBuildings]);
 
   // Load available orders when items change
   useEffect(() => {
@@ -234,6 +247,18 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
             </div>
           </Section>
 
+          {/* === Подложка === */}
+          {overlayUrl && (
+            <Section title="Область на подложке">
+              <div className="rounded-lg overflow-hidden border" style={{ borderColor: "var(--ds-border)" }}>
+                <img src={overlayUrl} alt="Подложка" className="w-full max-h-48 object-contain" style={{ background: "var(--ds-surface-sunken)" }} />
+              </div>
+              <p className="text-xs mt-1" style={{ color: "var(--ds-text-faint)" }}>
+                Подложка загружена. Разметка области будет доступна после создания работы.
+              </p>
+            </Section>
+          )}
+
           {/* === Материалы === */}
           <Section title="Необходимые материалы">
             {items.map((it) => (
@@ -347,9 +372,20 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
       {showOrderModal && (
         <CreateOrderModal
           onClose={() => setShowOrderModal(false)}
+          prefill={{
+            building_id: selBuilding || undefined,
+            work_type_id: selWorkType || undefined,
+            floor_id: selFloor || undefined,
+            construction_id: selConstruction || undefined,
+            items: validItems.map(it => ({
+              material_name: it.material_name,
+              unit_id: it.unit_id,
+              unit_name: it.unit_name,
+              quantity: it.required_qty,
+            })),
+          }}
           onCreated={() => {
             setShowOrderModal(false);
-            // Refresh available orders
             if (project) {
               api.get<AvailableOrder[]>("/api/installation/available-materials", { project_id: project.id })
                 .then(r => { if (r.data) setAvailableOrders(r.data); });
