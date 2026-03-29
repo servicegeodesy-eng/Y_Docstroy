@@ -331,14 +331,96 @@ export function buildSelectSQL(table: string, req: Request): BuiltQuery {
 
   let sql = `SELECT ${selectParts.join(', ')} FROM "${table}" t`;
 
+  // --- Collect dot-notation filters for joined tables ---
+  // e.g. cells.cell_type=eq.registry → joinFilters["cells"] = [{ col: "cell_type", op: "eq", val: "registry" }]
+  const joinFilters: Record<string, { col: string; rawValue: string }[]> = {};
+  for (const [key, rawValue] of Object.entries(q)) {
+    if (!key.includes('.')) continue;
+    const [joinAlias, col] = key.split('.', 2);
+    if (!joinFilters[joinAlias]) joinFilters[joinAlias] = [];
+    joinFilters[joinAlias].push({ col, rawValue: rawValue as string });
+  }
+
+  // --- Rebuild JOIN subqueries with filters & inner support ---
+  // Re-generate selectParts for joins that have filters or isInner
+  if (!isCountOnly) {
+    // Re-scan joins to add WHERE clauses into subqueries
+    for (let i = 0; i < joins.length; i++) {
+      const join = joins[i];
+      const filters = joinFilters[join.alias] || [];
+      if (filters.length === 0 && !join.isInner) continue;
+
+      const cols = join.columns.includes('*') ? '*'
+        : join.columns.map(c => `"${c}"`).join(', ');
+
+      // Build extra WHERE conditions for the subquery
+      const extraWhere: string[] = [];
+      for (const f of filters) {
+        const dotIdx = f.rawValue.indexOf('.');
+        if (dotIdx === -1) {
+          extraWhere.push(`"${f.col}" = $${paramIdx}`);
+          values.push(f.rawValue);
+          paramIdx++;
+        } else {
+          const op = f.rawValue.substring(0, dotIdx);
+          const val = f.rawValue.substring(dotIdx + 1);
+          if (op === 'eq') {
+            extraWhere.push(`"${f.col}" = $${paramIdx}`);
+            values.push(val);
+            paramIdx++;
+          } else if (op === 'neq') {
+            extraWhere.push(`"${f.col}" != $${paramIdx}`);
+            values.push(val);
+            paramIdx++;
+          } else if (op === 'is') {
+            extraWhere.push(`"${f.col}" IS ${val === 'null' ? 'NULL' : 'NOT NULL'}`);
+          }
+        }
+      }
+      const extraWhereSQL = extraWhere.length > 0 ? ` AND ${extraWhere.join(' AND ')}` : '';
+
+      // Find and replace the select part for this join
+      const aliasQuoted = `"${join.alias}"`;
+      const partIdx = selectParts.findIndex(p => p.endsWith(`AS ${aliasQuoted}`));
+      if (partIdx === -1) continue;
+
+      if (join.isReverse) {
+        const fkRef = `"${join.table}"."${join.fkColumn}"`;
+        selectParts[partIdx] =
+          `COALESCE((SELECT json_agg(sub) FROM (SELECT ${cols} FROM "${join.table}" WHERE ${fkRef} = t."id"${extraWhereSQL}) sub), '[]'::json) AS ${aliasQuoted}`;
+      } else {
+        const fk = join.fkColumn || `${join.table}_id`;
+        selectParts[partIdx] =
+          `(SELECT row_to_json(sub) FROM (SELECT ${cols} FROM "${join.table}" WHERE "id" = t."${fk}"${extraWhereSQL} LIMIT 1) sub) AS ${aliasQuoted}`;
+      }
+
+      // For !inner joins — add WHERE EXISTS to filter out main rows without match
+      if (join.isInner) {
+        const fk = join.isReverse ? join.fkColumn : (join.fkColumn || `${join.table}_id`);
+        const existsCond = join.isReverse
+          ? `SELECT 1 FROM "${join.table}" WHERE "${join.table}"."${fk}" = t."id"${extraWhereSQL}`
+          : `SELECT 1 FROM "${join.table}" WHERE "id" = t."${fk}"${extraWhereSQL}`;
+        // Store for later (we'll add to whereParts)
+        if (!joinFilters['__inner_exists__']) joinFilters['__inner_exists__'] = [];
+        joinFilters['__inner_exists__'].push({ col: existsCond, rawValue: '__exists__' });
+      }
+    }
+  }
+
   // --- WHERE ---
   const whereParts: string[] = [];
   const skipParams = new Set(['select', 'order', 'limit', 'offset', 'count', 'head', '_table', 'or']);
 
+  // Add !inner EXISTS conditions
+  const innerExists = joinFilters['__inner_exists__'] || [];
+  for (const ie of innerExists) {
+    whereParts.push(`EXISTS (${ie.col})`);
+  }
+
   for (const [key, rawValue] of Object.entries(q)) {
     if (skipParams.has(key)) continue;
 
-    // Skip dot-notation filters on joined tables (e.g. cells.project_id)
+    // Skip dot-notation filters on joined tables (handled above)
     if (key.includes('.')) continue;
 
     const value = rawValue as string;
