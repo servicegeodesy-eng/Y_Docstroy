@@ -341,7 +341,7 @@ export default function Sidebar({ isAdmin, mobileMode, onNavigate, badges }: Sid
           <div className="px-2 pb-2 mb-1" style={{ borderBottom: "1px solid var(--ds-sidebar-border)" }}>
             <div className="flex rounded-lg p-0.5" style={{ background: "rgba(255,255,255,0.08)" }}>
               <button
-                onClick={() => setWorkspaceMode("geodesy")}
+                onClick={() => { setWorkspaceMode("geodesy"); navigate(`/projects/${projectId}/registry`); }}
                 className="flex-1 px-2 py-1 text-xs font-medium rounded-md transition-colors"
                 style={workspaceMode === "geodesy"
                   ? { background: "rgba(255,255,255,0.15)", color: "#fff" }
@@ -350,7 +350,7 @@ export default function Sidebar({ isAdmin, mobileMode, onNavigate, badges }: Sid
                 Геодезия
               </button>
               <button
-                onClick={() => setWorkspaceMode("production")}
+                onClick={() => { setWorkspaceMode("production"); navigate(`/projects/${projectId}/installation`); }}
                 className="flex-1 px-2 py-1 text-xs font-medium rounded-md transition-colors"
                 style={workspaceMode === "production"
                   ? { background: "rgba(255,255,255,0.15)", color: "#fff" }
@@ -363,7 +363,11 @@ export default function Sidebar({ isAdmin, mobileMode, onNavigate, badges }: Sid
         )}
         {!geo && canSwitchWorkspace && isCollapsed && (
           <button
-            onClick={() => setWorkspaceMode(workspaceMode === "geodesy" ? "production" : "geodesy")}
+            onClick={() => {
+              const next = workspaceMode === "geodesy" ? "production" : "geodesy";
+              setWorkspaceMode(next);
+              navigate(`/projects/${projectId}/${next === "geodesy" ? "registry" : "installation"}`);
+            }}
             className="ds-nav-link justify-center mb-1"
             title={workspaceMode === "geodesy" ? "Переключить на Производство" : "Переключить на Геодезию"}
           >
@@ -376,16 +380,16 @@ export default function Sidebar({ isAdmin, mobileMode, onNavigate, badges }: Sid
         {/* ═══ РМ Производителя работ (Прораба) ═══ */}
         {!geo && isWorkProducer && (
           <>
-            <NavLink to={`/projects/${projectId}/${materialsItem.path}`} className={linkClass}
-              title={isCollapsed ? materialsItem.label : undefined} onClick={handleLinkClick}>
-              {materialsItem.icon}
-              {!isCollapsed && <span className="truncate">{materialsItem.label}</span>}
-            </NavLink>
-
             <NavLink to={`/projects/${projectId}/${installationItem.path}`} className={linkClass}
               title={isCollapsed ? installationItem.label : undefined} onClick={handleLinkClick}>
               {installationItem.icon}
               {!isCollapsed && <span className="truncate">{installationItem.label}</span>}
+            </NavLink>
+
+            <NavLink to={`/projects/${projectId}/${materialsItem.path}`} className={linkClass}
+              title={isCollapsed ? materialsItem.label : undefined} onClick={handleLinkClick}>
+              {materialsItem.icon}
+              {!isCollapsed && <span className="truncate">{materialsItem.label}</span>}
             </NavLink>
 
             {canViewRequests && (

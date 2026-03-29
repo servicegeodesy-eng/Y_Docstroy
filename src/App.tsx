@@ -4,6 +4,7 @@ import { useAuth } from "./lib/AuthContext";
 import { isGeoMode } from "./lib/geoMode";
 import { ErrorBoundary } from "./components/ui/ErrorBoundary";
 import ForcePasswordChangeModal from "./components/ForcePasswordChangeModal";
+import { useProject } from "./lib/ProjectContext";
 
 const AuthPage = lazy(() => import("./pages/AuthPage"));
 const ProjectsPage = lazy(() => import("./pages/ProjectsPage"));
@@ -35,6 +36,14 @@ function PageLoader() {
       </div>
     </div>
   );
+}
+
+function WorkspaceRedirect() {
+  const geo = isGeoMode();
+  if (geo) return <Navigate to="requests" replace />;
+  const { userRole } = useProject();
+  if (userRole === "Производитель работ") return <Navigate to="installation" replace />;
+  return <Navigate to="registry" replace />;
 }
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -105,7 +114,7 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          <Route index element={<Navigate to={geo ? "requests" : "registry"} replace />} />
+          <Route index element={<WorkspaceRedirect />} />
 
           {!geo && <Route path="registry" element={<RegistryPage />} />}
           {!geo && <Route path="construction" element={<ConstructionMapPage />} />}
