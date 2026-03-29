@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { api } from "@/lib/api";
 import { useProject } from "@/lib/ProjectContext";
 import { useDictionaries } from "@/hooks/useDictionaries";
@@ -11,6 +11,8 @@ import PolygonDrawer from "@/components/plan/PolygonDrawer";
 import type { Point } from "@/components/plan/SnapEngine";
 import { useCellMasks } from "@/hooks/useCellMasks";
 import { useProjectStatuses } from "@/hooks/useProjectStatuses";
+import { useAxisCalibration } from "@/hooks/useAxisCalibration";
+import { detectAxesForPolygons } from "@/lib/axisDetection";
 
 interface NomenclatureItem { id: string; name: string; unit_id?: string }
 interface UnitItem { id: string; short_name: string; name: string }
@@ -48,10 +50,30 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
   // Overlay & mask
   const [overlayIdForMasks, setOverlayIdForMasks] = useState<string | null>(null);
   const { masks: existingCellMasks } = useCellMasks(overlayIdForMasks);
+  const { calibratedAxes, axisOrder } = useAxisCalibration(overlayIdForMasks);
   const [linkedOverlay, setLinkedOverlay] = useState<{ id: string; name: string; width: number; height: number; storage_path: string } | null>(null);
   const [overlayUrl, setOverlayUrl] = useState("");
   const [showOverlayEditor, setShowOverlayEditor] = useState(false);
   const [drawnPolygons, setDrawnPolygons] = useState<Point[][]>([]);
+
+  // Автоопределение осей при отрисовке полигонов
+  const detectedAxisLabel = useMemo(() => {
+    if (drawnPolygons.length === 0 || calibratedAxes.length === 0) return null;
+    return detectAxesForPolygons(drawnPolygons, calibratedAxes, axisOrder);
+  }, [drawnPolygons, calibratedAxes, axisOrder]);
+
+  // Автозаполнение примечания при изменении осей
+  useEffect(() => {
+    setNotes((prev) => {
+      const cleaned = prev
+        .replace(/,?\s*в осях\s+[^\n]*/g, '')
+        .replace(/,?\s*возле оси\s+[^\n]*/g, '')
+        .replace(/,?\s*область находится за пределами строительных осей/g, '')
+        .trim();
+      if (!detectedAxisLabel) return cleaned;
+      return cleaned ? `${cleaned}, ${detectedAxisLabel}` : detectedAxisLabel;
+    });
+  }, [detectedAxisLabel]);
 
   // Materials
   const [items, setItems] = useState<MaterialRow[]>([emptyRow()]);
