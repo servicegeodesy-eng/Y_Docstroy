@@ -14,6 +14,10 @@ router.use(authMiddleware);
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 const MAIN_BUCKET = process.env.S3_BUCKET || 'docstroy';
 
+function fixFileName(name: string): string {
+  try { return Buffer.from(name, 'latin1').toString('utf-8'); } catch { return name; }
+}
+
 // POST /api/installation/files — загрузить файл/фото к работе
 router.post('/files', upload.single('file'), async (req: AuthRequest, res: Response) => {
   try {
@@ -28,7 +32,7 @@ router.post('/files', upload.single('file'), async (req: AuthRequest, res: Respo
     if (work.rows.length === 0) { res.status(404).json({ error: 'Работа не найдена' }); return; }
 
     const projectId = work.rows[0].project_id;
-    const ext = path.extname(file.originalname);
+    const ext = path.extname(fixFileName(file.originalname));
     const storagePath = `${projectId}/installation/${workId}/${uuidv4()}${ext}`;
 
     await s3Client.send(new PutObjectCommand({
@@ -38,7 +42,7 @@ router.post('/files', upload.single('file'), async (req: AuthRequest, res: Respo
     const result = await pool.query(
       `INSERT INTO installation_files (work_id, file_name, storage_path, file_size, mime_type, category, created_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [workId, file.originalname, storagePath, file.size, file.mimetype, category, userId]
+      [workId, fixFileName(file.originalname), storagePath, file.size, file.mimetype, category, userId]
     );
 
     res.status(201).json(result.rows[0]);
@@ -256,7 +260,26 @@ router.post('/works/:id/use-material', async (req: AuthRequest, res: Response) =
       [workId, JSON.stringify({ material_id: installation_material_id, quantity }), userId]
     );
 
-    res.json(result.rows[0]);
+    // Автозавершение: если все материалы использованы (used_qty >= required_qty)
+    const allMats = await pool.query(
+      'SELECT required_qty, used_qty FROM installation_materials WHERE work_id = $1',
+      [workId]
+    );
+    const allDone = allMats.rows.length > 0 && allMats.rows.every(
+      (m: { required_qty: number; used_qty: number }) => Number(m.used_qty) >= Number(m.required_qty)
+    );
+    if (allDone) {
+      await pool.query(
+        `UPDATE installation_works SET status = 'completed', completed_at = NOW(), updated_at = NOW() WHERE id = $1`,
+        [workId]
+      );
+      await pool.query(
+        `INSERT INTO installation_log (work_id, action, created_by) VALUES ($1, 'auto_completed', $2)`,
+        [workId, userId]
+      );
+    }
+
+    res.json({ ...result.rows[0], work_completed: allDone });
   } catch (err) {
     console.error('Use material error:', err);
     res.status(500).json({ error: 'Ошибка сервера' });
