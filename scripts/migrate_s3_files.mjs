@@ -49,49 +49,59 @@ const LEGACY_BUCKETS = {
   'fileshare-files': process.env.S3_BUCKET_FILESHARE_FILES || 'docstroy-fileshare-files',
 };
 
+// Извлечь имя файла из storage_path (последний сегмент: uuid.ext)
+function fileName(storagePath) {
+  return storagePath.split('/').pop();
+}
+
 // Таблицы и их связь с бакетами и проектами
+// Старые форматы storage_path:
+//   cell_files:       "projectId/cellId/uuid.ext"
+//   overlays:         "uuid.ext"
+//   fileshare:        "uuid.ext"
+//   gro/support:      различные
 const FILE_TABLES = [
   {
     table: 'cell_files',
     pathCol: 'storage_path',
     legacyBucket: 'cell-files',
-    // cell_files → cells → projects
+    // cell_files → cells → projects; берём cell_id для корректного пути
     projectQuery: `
-      SELECT cf.id, cf.storage_path, c.project_id, p.company_id
+      SELECT cf.id, cf.storage_path, cf.cell_id, c.project_id, p.company_id
       FROM cell_files cf
       JOIN cells c ON c.id = cf.cell_id
       JOIN projects p ON p.id = c.project_id
       WHERE cf.storage_path NOT LIKE '%/projects/%'
     `,
-    newPathFn: (row) => `${row.company_id}/projects/${row.project_id}/cells/${row.storage_path}`,
+    newPathFn: (row) => `${row.company_id}/projects/${row.project_id}/cells/${row.cell_id}/${fileName(row.storage_path)}`,
   },
   {
     table: 'cell_file_versions',
     pathCol: 'storage_path',
     legacyBucket: 'cell-files',
     projectQuery: `
-      SELECT cfv.id, cfv.storage_path, c.project_id, p.company_id
+      SELECT cfv.id, cfv.storage_path, cf.cell_id, c.project_id, p.company_id
       FROM cell_file_versions cfv
       JOIN cell_files cf ON cf.id = cfv.cell_file_id
       JOIN cells c ON c.id = cf.cell_id
       JOIN projects p ON p.id = c.project_id
       WHERE cfv.storage_path NOT LIKE '%/projects/%'
     `,
-    newPathFn: (row) => `${row.company_id}/projects/${row.project_id}/cells/versions/${row.storage_path}`,
+    newPathFn: (row) => `${row.company_id}/projects/${row.project_id}/cells/${row.cell_id}/versions/${fileName(row.storage_path)}`,
   },
   {
     table: 'cell_comment_files',
     pathCol: 'storage_path',
     legacyBucket: 'cell-files',
     projectQuery: `
-      SELECT ccf.id, ccf.storage_path, c.project_id, p.company_id
+      SELECT ccf.id, ccf.storage_path, cc.cell_id, c.project_id, p.company_id
       FROM cell_comment_files ccf
       JOIN cell_comments cc ON cc.id = ccf.comment_id
       JOIN cells c ON c.id = cc.cell_id
       JOIN projects p ON p.id = c.project_id
       WHERE ccf.storage_path NOT LIKE '%/projects/%'
     `,
-    newPathFn: (row) => `${row.company_id}/projects/${row.project_id}/cells/comments/${row.storage_path}`,
+    newPathFn: (row) => `${row.company_id}/projects/${row.project_id}/cells/${row.cell_id}/comments/${fileName(row.storage_path)}`,
   },
   {
     table: 'dict_overlays',
@@ -103,47 +113,47 @@ const FILE_TABLES = [
       JOIN projects p ON p.id = d.project_id
       WHERE d.storage_path NOT LIKE '%/projects/%'
     `,
-    newPathFn: (row) => `${row.company_id}/projects/${row.project_id}/overlays/${row.storage_path}`,
+    newPathFn: (row) => `${row.company_id}/projects/${row.project_id}/overlays/${fileName(row.storage_path)}`,
   },
   {
     table: 'gro_cell_files',
     pathCol: 'storage_path',
     legacyBucket: 'cell-files',
     projectQuery: `
-      SELECT gcf.id, gcf.storage_path, gc.project_id, p.company_id
+      SELECT gcf.id, gcf.storage_path, gcf.gro_cell_id, gc.project_id, p.company_id
       FROM gro_cell_files gcf
       JOIN gro_cells gc ON gc.id = gcf.gro_cell_id
       JOIN projects p ON p.id = gc.project_id
       WHERE gcf.storage_path NOT LIKE '%/projects/%'
     `,
-    newPathFn: (row) => `${row.company_id}/projects/${row.project_id}/gro/${row.storage_path}`,
+    newPathFn: (row) => `${row.company_id}/projects/${row.project_id}/gro/${row.gro_cell_id}/${fileName(row.storage_path)}`,
   },
   {
     table: 'gro_cell_file_versions',
     pathCol: 'storage_path',
     legacyBucket: 'cell-files',
     projectQuery: `
-      SELECT gfv.id, gfv.storage_path, gc.project_id, p.company_id
+      SELECT gfv.id, gfv.storage_path, gcf.gro_cell_id, gc.project_id, p.company_id
       FROM gro_cell_file_versions gfv
       JOIN gro_cell_files gcf ON gcf.id = gfv.file_id
       JOIN gro_cells gc ON gc.id = gcf.gro_cell_id
       JOIN projects p ON p.id = gc.project_id
       WHERE gfv.storage_path NOT LIKE '%/projects/%'
     `,
-    newPathFn: (row) => `${row.company_id}/projects/${row.project_id}/gro/versions/${row.storage_path}`,
+    newPathFn: (row) => `${row.company_id}/projects/${row.project_id}/gro/${row.gro_cell_id}/versions/${fileName(row.storage_path)}`,
   },
   {
     table: 'file_share_files',
     pathCol: 'storage_path',
     legacyBucket: 'fileshare-files',
     projectQuery: `
-      SELECT fsf.id, fsf.storage_path, fs.project_id, p.company_id
+      SELECT fsf.id, fsf.storage_path, fsf.file_share_id, fs.project_id, p.company_id
       FROM file_share_files fsf
       JOIN file_shares fs ON fs.id = fsf.file_share_id
       JOIN projects p ON p.id = fs.project_id
       WHERE fsf.storage_path NOT LIKE '%/projects/%'
     `,
-    newPathFn: (row) => `${row.company_id}/projects/${row.project_id}/fileshare/${row.storage_path}`,
+    newPathFn: (row) => `${row.company_id}/projects/${row.project_id}/fileshare/${fileName(row.storage_path)}`,
   },
   {
     table: 'support_message_files',
@@ -156,7 +166,7 @@ const FILE_TABLES = [
       JOIN projects p ON p.id = sm.project_id
       WHERE smf.storage_path NOT LIKE '%/projects/%'
     `,
-    newPathFn: (row) => `${row.company_id}/projects/${row.project_id}/support/${row.storage_path}`,
+    newPathFn: (row) => `${row.company_id}/projects/${row.project_id}/support/${fileName(row.storage_path)}`,
   },
 ];
 
