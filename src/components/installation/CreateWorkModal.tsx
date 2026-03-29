@@ -51,6 +51,7 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
   const [overlayIdForMasks, setOverlayIdForMasks] = useState<string | null>(null);
   const { masks: existingCellMasks } = useCellMasks(overlayIdForMasks);
   const { calibratedAxes, axisOrder } = useAxisCalibration(overlayIdForMasks);
+  const [workMasksForOverlay, setWorkMasksForOverlay] = useState<import("@/hooks/useCellMasks").MaskWithCell[]>([]);
   const [linkedOverlay, setLinkedOverlay] = useState<{ id: string; name: string; width: number; height: number; storage_path: string } | null>(null);
   const [overlayUrl, setOverlayUrl] = useState("");
   const [showOverlayEditor, setShowOverlayEditor] = useState(false);
@@ -125,6 +126,20 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
       setLinkedOverlay({ id: match.id, name: match.name, width: match.width || 1000, height: match.height || 750, storage_path: match.storage_path });
       setOverlayIdForMasks(match.id);
       getOverlayUrl(match.storage_path).then(setOverlayUrl);
+      // Загружаем маски работ для этой подложки
+      api.get<Record<string, unknown>[]>("/api/installation/masks", { overlay_id: match.id }).then(r => {
+        if (r.data) {
+          setWorkMasksForOverlay(r.data.map(m => ({
+            id: m.id as string, cell_id: "", overlay_id: m.overlay_id as string,
+            polygon_points: typeof m.polygon_points === "string" ? JSON.parse(m.polygon_points as string) : m.polygon_points as { x: number; y: number }[],
+            created_at: "", updated_at: "",
+            cell_name: `Работа (${m.work_status === "in_progress" ? "в процессе" : m.work_status === "completed" ? "завершено" : "план"})`,
+            cell_status: m.work_status === "in_progress" ? "На проверке" : m.work_status === "completed" ? "Подписано" : "Новый",
+            cell_updated_at: "", cell_progress_percent: Number(m.progress) || 0,
+            cell_building_id: null, cell_work_type_id: null, cell_floor_id: null, cell_construction_id: null, cell_set_id: null,
+          })));
+        }
+      });
     } else {
       setLinkedOverlay(null);
       setOverlayIdForMasks(null);
@@ -278,7 +293,7 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
             imageUrl={overlayUrl}
             imageWidth={linkedOverlay.width}
             imageHeight={linkedOverlay.height}
-            existingMasks={existingCellMasks}
+            existingMasks={[...existingCellMasks, ...workMasksForOverlay]}
             newPolygons={drawnPolygons}
             onRemovePolygon={(index) => setDrawnPolygons(p => p.filter((_, i) => i !== index))}
             getColorKey={getColorKey}

@@ -343,7 +343,8 @@ router.get('/available-materials', async (req: AuthRequest, res: Response) => {
 
     sql += ` ORDER BY mo.order_number, dm.name`;
     const result = await pool.query(sql, params);
-    res.json(result.rows);
+    // Фильтруем: не показывать заявки с 0 доступных
+    res.json(result.rows.filter((r: { available_qty: number }) => Number(r.available_qty) > 0));
   } catch (err) {
     console.error('Get available materials error:', err);
     res.status(500).json({ error: 'Ошибка сервера' });
