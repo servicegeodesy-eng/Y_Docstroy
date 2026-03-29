@@ -14,36 +14,64 @@ const ZONES: Zone[] = [
   { id: "territory",   label: "Территория строительства", path: "plan" },
   { id: "landscaping", label: "Благоустройство",          path: "landscaping" },
   { id: "foundation",  label: "Основание",                path: "plan" },
-  { id: "pit",         label: "Ограждение котлована",       path: "plan" },
-  { id: "piles",       label: "Сваи",                      path: "plan" },
-  { id: "earthwork",   label: "Объёмы земляных масс",      path: "plan" },
+  { id: "pit",         label: "Ограждение котлована",      path: "plan" },
+  { id: "piles",       label: "Сваи",                     path: "plan" },
+  { id: "earthwork",   label: "Объёмы земляных масс",     path: "plan" },
 ];
 
-/* ---- Framed label ---- */
+/* ---- Framed label with integrated leader line ---- */
 function FramedLabel({
   x, y, text, text2, anchor = "start", dk, id, hovered,
+  lineFromX, lineFromY,
 }: {
-  x: number; y: number; text: string; text2?: string; anchor?: "start" | "middle" | "end"; dk: boolean; id: string; hovered: string | null;
+  x: number; y: number; text: string; text2?: string;
+  anchor?: "start" | "middle" | "end";
+  dk: boolean; id: string; hovered: string | null;
+  lineFromX?: number; lineFromY?: number;
 }) {
   const isH = hovered === id;
-  const lH = 16, padX = 8, padY = 4, charW = 7.2;
+  const lH = 16, padX = 8, padY = 5, charW = 7.2;
   const lines = text2 ? [text, text2] : [text];
   const maxL = Math.max(...lines.map((l) => l.length));
   const bW = maxL * charW + padX * 2;
   const bH = lines.length * lH + padY * 2;
   const bx = anchor === "end" ? x - bW : anchor === "middle" ? x - bW / 2 : x;
-  const by = y - bH + padY;
+  const by = y;
+
+  // Find nearest point on box border to lineFrom
+  let lineToX = bx + bW / 2, lineToY = by + bH / 2;
+  if (lineFromX !== undefined && lineFromY !== undefined) {
+    const cx = bx + bW / 2, cy = by + bH / 2;
+    const dx = lineFromX - cx, dy = lineFromY - cy;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) {
+      lineToX = cx; lineToY = cy;
+    } else {
+      // Scale to hit box edge
+      const sx = dx !== 0 ? (bW / 2) / Math.abs(dx) : 999;
+      const sy = dy !== 0 ? (bH / 2) / Math.abs(dy) : 999;
+      const s = Math.min(sx, sy);
+      lineToX = cx + dx * s;
+      lineToY = cy + dy * s;
+    }
+  }
+
+  const lc = dk ? "#5a6a7a" : "#8a9aaa";
+
   return (
-    <g style={{ pointerEvents: "none" }}>
+    <>
+      {lineFromX !== undefined && lineFromY !== undefined && (
+        <line x1={lineFromX} y1={lineFromY} x2={lineToX} y2={lineToY} stroke={isH ? (dk ? "#7aaad0" : "#1E3A5F") : lc} strokeWidth="1" style={{ pointerEvents: "none" }} />
+      )}
       <rect x={bx} y={by} width={bW} height={bH} rx="4"
         fill={dk ? "rgba(26,37,54,0.92)" : "rgba(255,255,255,0.92)"}
         stroke={isH ? (dk ? "#7aaad0" : "#1E3A5F") : (dk ? "#4a5a6a" : "#b0bcc8")}
         strokeWidth={isH ? 1.5 : 1}
+        style={{ cursor: "pointer" }}
       />
       {lines.map((l, i) => (
-        <text key={i} x={bx + padX} y={by + padY + (i + 1) * lH - 3} fontSize="12" fontWeight="600" fill={dk ? "#7aaad0" : "#1E3A5F"}>{l}</text>
+        <text key={i} x={bx + padX} y={by + padY + (i + 1) * lH - 3} fontSize="12" fontWeight="600" fill={dk ? "#7aaad0" : "#1E3A5F"} style={{ pointerEvents: "none" }}>{l}</text>
       ))}
-    </g>
+    </>
   );
 }
 
@@ -191,24 +219,29 @@ export default function ConstructionMapPage() {
   const p = (light: string, dark: string) => `url(#${dk ? dark : light})`;
 
   /* ---- Layout constants ---- */
-  const W = 1000, H = 560;
-  const GL = 340; // ground line
+  const W = 1000, H = 580;
+  const GL = 300; // ground line — moved up to give more room underground
   // Building
-  const BX = 310, BY = 100, BW = 210, BH = GL - BY;
+  const BX = 310, BY = 80, BW = 210, BH = GL - BY;
   // Frame (exposed structure, right side)
   const FX = BX + BW, FY = BY, FW = 115, FH = BH;
   // Roof
-  const RoofPeak = 48, RoofLeft = BX - 22, RoofRight = FX + FW + 22;
-  // Underground — flat pit
-  const PitLeft = BX - 16, PitRight = FX + FW + 16;
-  const FoundH = 24;
-  const PitH = 28; // very flat strip
-  // Earthwork — on surface, left of building
-  const PileX = 120, PileW = 130, PileH = 50;
+  const RoofPeak = 38, RoofLeft = BX - 22, RoofRight = FX + FW + 22;
+  // Underground structure
+  const SheetW = 14; // shoring wall width
+  const ShoringLeft = BX - 16;
+  const ShoringRight = FX + FW + 16;
+  const ShoringTop = GL + 6; // starts just below ground
+  const ShoringBottom = GL + 130; // goes deep
+  const FoundH = 22; // foundation height (inside shoring)
+  const PitTop = GL + 6 + FoundH; // pit starts below foundation
+  const PitBottom = ShoringBottom; // pit ends at shoring bottom
+  // Piles — below shoring
+  const PileDepth = 70;
+  // Earthwork — on surface, left side
+  const PileX = 140, PileW = 120, PileH = 46;
   // Landscaping — right of building
   const LandX = FX + FW + 50;
-
-  const lc = dk ? "#5a6a7a" : "#8a9aaa";
 
   return (
     <div
@@ -232,15 +265,16 @@ export default function ConstructionMapPage() {
 
         {/* ====== TERRITORY ====== */}
         <g {...zoneProps("territory")}>
-          <rect x="55" y={GL - 84} width={W - 110} height="84" fill="none"
+          <rect x="55" y={GL - 80} width={W - 110} height="80" fill="none"
             stroke={dk ? "#7aaad0" : "#2c5a8a"} strokeWidth="1.5" strokeDasharray="12 6"
             opacity={hovered === "territory" ? 0.9 : 0.4}
           />
           {Array.from({ length: 13 }, (_, i) => 55 + i * 72).map((x) => (
-            <line key={`fp-${x}`} x1={x} y1={GL - 84} x2={x} y2={GL - 76} stroke={dk ? "#7aaad0" : "#2c5a8a"} strokeWidth="2" opacity="0.5" />
+            <line key={`fp-${x}`} x1={x} y1={GL - 80} x2={x} y2={GL - 72} stroke={dk ? "#7aaad0" : "#2c5a8a"} strokeWidth="2" opacity="0.5" />
           ))}
-          <line x1="100" y1={GL - 68} x2="22" y2={GL - 96} stroke={lc} strokeWidth="1" />
-          <FramedLabel x={4} y={GL - 80} text="Территория" text2="строительства" dk={dk} id="territory" hovered={hovered} />
+          {/* Label left side, high up */}
+          <FramedLabel x={4} y={8} text="Территория" text2="строительства" dk={dk} id="territory" hovered={hovered}
+            lineFromX={200} lineFromY={GL - 70} />
         </g>
 
         {/* ====== FACADE ====== */}
@@ -248,21 +282,21 @@ export default function ConstructionMapPage() {
           <rect x={BX} y={BY} width={BW} height={BH} fill={p("pat-brick", "pat-brick-dk")} stroke={dk ? "#667788" : "#6a5a4a"} strokeWidth="2" />
           {[0, 1, 2, 3].map((row) =>
             [0, 1, 2].map((col) => {
-              const wx = BX + 18 + col * 65, wy = BY + 18 + row * 52;
+              const wx = BX + 18 + col * 65, wy = BY + 18 + row * 46;
               return (
                 <g key={`w-${row}-${col}`}>
-                  <rect x={wx} y={wy} width="44" height="32" rx="2" fill={dk ? "#2a4060" : "#c8ddf0"} stroke={dk ? "#5a7a9a" : "#7a9aba"} strokeWidth="1.2" />
-                  <line x1={wx + 22} y1={wy} x2={wx + 22} y2={wy + 32} stroke={dk ? "#4a6a8a" : "#9ab8d4"} strokeWidth="0.8" />
-                  <line x1={wx} y1={wy + 16} x2={wx + 44} y2={wy + 16} stroke={dk ? "#4a6a8a" : "#9ab8d4"} strokeWidth="0.8" />
+                  <rect x={wx} y={wy} width="44" height="30" rx="2" fill={dk ? "#2a4060" : "#c8ddf0"} stroke={dk ? "#5a7a9a" : "#7a9aba"} strokeWidth="1.2" />
+                  <line x1={wx + 22} y1={wy} x2={wx + 22} y2={wy + 30} stroke={dk ? "#4a6a8a" : "#9ab8d4"} strokeWidth="0.8" />
+                  <line x1={wx} y1={wy + 15} x2={wx + 44} y2={wy + 15} stroke={dk ? "#4a6a8a" : "#9ab8d4"} strokeWidth="0.8" />
                 </g>
               );
             }),
           )}
-          <rect x={BX + 78} y={BY + BH - 50} width="54" height="50" rx="3" fill={dk ? "#2a3848" : "#5a4a3a"} stroke={dk ? "#4a6070" : "#4a3a2a"} strokeWidth="1.5" />
+          <rect x={BX + 78} y={BY + BH - 48} width="54" height="48" rx="3" fill={dk ? "#2a3848" : "#5a4a3a"} stroke={dk ? "#4a6070" : "#4a3a2a"} strokeWidth="1.5" />
           <circle cx={BX + 122} cy={BY + BH - 22} r="3" fill={dk ? "#8ab0d0" : "#c8a868"} />
           {/* Label upper-left */}
-          <line x1={BX + 10} y1={BY + 30} x2={BX - 46} y2={BY - 6} stroke={lc} strokeWidth="1" />
-          <FramedLabel x={BX - 48} y={BY - 8} text="Фасад" anchor="end" dk={dk} id="facade" hovered={hovered} />
+          <FramedLabel x={BX - 90} y={BY - 8} text="Фасад" anchor="end" dk={dk} id="facade" hovered={hovered}
+            lineFromX={BX + 20} lineFromY={BY + 40} />
         </g>
 
         {/* ====== FRAME ====== */}
@@ -281,8 +315,8 @@ export default function ConstructionMapPage() {
           <line x1={FX + 63} y1={FY + FH / 2 + 8} x2={FX + FW - 10} y2={FY + 3 * FH / 4 - 8} stroke={dk ? "#d08a40" : "#c07030"} strokeWidth="1.5" opacity="0.5" />
           <line x1={FX + FW - 10} y1={FY + FH / 2 + 8} x2={FX + 63} y2={FY + 3 * FH / 4 - 8} stroke={dk ? "#d08a40" : "#c07030"} strokeWidth="1.5" opacity="0.5" />
           {/* Label upper-right */}
-          <line x1={FX + FW - 12} y1={FY + 30} x2={FX + FW + 36} y2={BY - 6} stroke={lc} strokeWidth="1" />
-          <FramedLabel x={FX + FW + 40} y={BY - 8} text="Каркас" dk={dk} id="frame" hovered={hovered} />
+          <FramedLabel x={FX + FW + 44} y={BY - 8} text="Каркас" dk={dk} id="frame" hovered={hovered}
+            lineFromX={FX + FW - 12} lineFromY={FY + 40} />
         </g>
 
         {/* ====== ROOF ====== */}
@@ -299,8 +333,8 @@ export default function ConstructionMapPage() {
             return <line key={`rt-${t}`} x1={RoofLeft + (mid - RoofLeft) * (1 - t) + 10} y1={ly} x2={RoofRight - (RoofRight - mid) * (1 - t) - 10} y2={ly} stroke={dk ? "#4a6888" : "#4a6888"} strokeWidth="0.6" opacity="0.4" />;
           })}
           {/* Label top-right */}
-          <line x1={RoofRight - 40} y1={RoofPeak + 10} x2={RoofRight + 30} y2={18} stroke={lc} strokeWidth="1" />
-          <FramedLabel x={RoofRight + 34} y={22} text="Кровля" dk={dk} id="roof" hovered={hovered} />
+          <FramedLabel x={RoofRight + 36} y={8} text="Кровля" dk={dk} id="roof" hovered={hovered}
+            lineFromX={RoofRight - 50} lineFromY={RoofPeak + 12} />
         </g>
 
         {/* ====== EARTHWORK — sand pile on surface ====== */}
@@ -309,84 +343,83 @@ export default function ConstructionMapPage() {
             d={`M${PileX - PileW / 2} ${GL}
                 Q${PileX - PileW / 2 + 10} ${GL - PileH * 0.6} ${PileX - PileW / 4} ${GL - PileH * 0.85}
                 Q${PileX} ${GL - PileH - 4} ${PileX + PileW / 4} ${GL - PileH * 0.8}
-                Q${PileX + PileW / 2 - 10} ${GL - PileH * 0.5} ${PileX + PileW / 2} ${GL}
-                Z`}
+                Q${PileX + PileW / 2 - 10} ${GL - PileH * 0.5} ${PileX + PileW / 2} ${GL}Z`}
             fill={p("pat-pile", "pat-pile-dk")}
             stroke={dk ? "#5a5040" : "#8a7a60"} strokeWidth="1.5" strokeLinejoin="round"
           />
-          {/* Layer lines */}
           <path d={`M${PileX - PileW / 2 + 12} ${GL - PileH * 0.3}Q${PileX} ${GL - PileH * 0.4} ${PileX + PileW / 2 - 12} ${GL - PileH * 0.25}`}
             fill="none" stroke={dk ? "#6a6050" : "#a09070"} strokeWidth="0.8" opacity="0.5" />
           <path d={`M${PileX - PileW / 2 + 20} ${GL - PileH * 0.55}Q${PileX} ${GL - PileH * 0.65} ${PileX + PileW / 2 - 20} ${GL - PileH * 0.5}`}
             fill="none" stroke={dk ? "#6a6050" : "#a09070"} strokeWidth="0.8" opacity="0.5" />
-          {/* Label left */}
-          <line x1={PileX - 20} y1={GL - PileH - 2} x2={PileX - 50} y2={GL - PileH - 36} stroke={lc} strokeWidth="1" />
-          <FramedLabel x={4} y={GL - PileH - 20} text="Объёмы" text2="земляных масс" dk={dk} id="earthwork" hovered={hovered} />
+          {/* Label — bottom-left, below ground */}
+          <FramedLabel x={4} y={GL + 16} text="Объёмы" text2="земляных масс" dk={dk} id="earthwork" hovered={hovered}
+            lineFromX={PileX} lineFromY={GL - PileH / 2} />
         </g>
 
         {/* ====== LANDSCAPING ====== */}
         <g {...zoneProps("landscaping")}>
           <rect x={LandX} y={GL - 5} width="185" height="7" fill={p("pat-grass", "pat-grass-dk")} />
-          {/* Tree */}
           <rect x={LandX + 68} y={GL - 64} width="10" height="60" rx="3" fill={dk ? "#5a4a30" : "#8a7050"} />
           <ellipse cx={LandX + 73} cy={GL - 82} rx="32" ry="26" fill={dk ? "#2a5a28" : "#6ab060"} opacity="0.7" />
           <ellipse cx={LandX + 62} cy={GL - 92} rx="22" ry="18" fill={dk ? "#2d6a2a" : "#78c068"} opacity="0.65" />
           <ellipse cx={LandX + 86} cy={GL - 87} rx="20" ry="16" fill={dk ? "#256025" : "#68b858"} opacity="0.6" />
           <ellipse cx={LandX + 73} cy={GL - 104} rx="16" ry="13" fill={dk ? "#308030" : "#80c878"} opacity="0.55" />
-          {/* Bush */}
           <ellipse cx={LandX + 146} cy={GL - 10} rx="16" ry="10" fill={dk ? "#2a5a28" : "#6ab060"} opacity="0.6" />
           <ellipse cx={LandX + 138} cy={GL - 14} rx="11" ry="8" fill={dk ? "#308030" : "#78c068"} opacity="0.5" />
-          {/* Path */}
           <path d={`M${LandX} ${GL - 2}Q${LandX + 50} ${GL - 6} ${LandX + 100} ${GL - 2}Q${LandX + 140} ${GL + 2} ${LandX + 185} ${GL - 2}`}
             fill="none" stroke={dk ? "#6a7a8a" : "#b0a898"} strokeWidth="3" opacity="0.5" strokeLinecap="round" />
           {/* Label right */}
-          <line x1={LandX + 135} y1={GL - 46} x2={LandX + 175} y2={GL - 70} stroke={lc} strokeWidth="1" />
-          <FramedLabel x={LandX + 179} y={GL - 52} text="Благоустройство" dk={dk} id="landscaping" hovered={hovered} />
+          <FramedLabel x={LandX + 140} y={GL - 120} text="Благоустройство" dk={dk} id="landscaping" hovered={hovered}
+            lineFromX={LandX + 100} lineFromY={GL - 40} />
         </g>
 
-        {/* ====== FOUNDATION ====== */}
-        <g {...zoneProps("foundation")}>
-          <rect x={PitLeft} y={GL} width={PitRight - PitLeft} height={FoundH}
-            fill={p("pat-concrete", "pat-concrete-dk")} stroke={dk ? "#5a7a90" : "#7a8a9a"} strokeWidth="1.5" />
-          {/* Label right */}
-          <line x1={PitRight - 20} y1={GL + FoundH / 2} x2={PitRight + 36} y2={GL + FoundH / 2 + 14} stroke={lc} strokeWidth="1" />
-          <FramedLabel x={PitRight + 40} y={GL + FoundH / 2 + 18} text="Основание" dk={dk} id="foundation" hovered={hovered} />
-        </g>
-
-        {/* ====== PIT (котлован + ограждение) ====== */}
+        {/* ====== PIT FENCE / SHORING (ограждение котлована) ====== */}
+        {/* Shoring walls go from just below ground level deep into earth */}
+        {/* Foundation and pit space are INSIDE the shoring */}
         <g {...zoneProps("pit")}>
-          {/* Sheet pile walls */}
-          <rect x={PitLeft} y={GL + FoundH} width="12" height={PitH} fill={p("pat-sheet", "pat-sheet-dk")} stroke={dk ? "#5a7a90" : "#5a7a9a"} strokeWidth="1" />
-          <rect x={PitRight - 12} y={GL + FoundH} width="12" height={PitH} fill={p("pat-sheet", "pat-sheet-dk")} stroke={dk ? "#5a7a90" : "#5a7a9a"} strokeWidth="1" />
-          {/* Pit interior */}
-          <rect x={PitLeft + 12} y={GL + FoundH} width={PitRight - PitLeft - 24} height={PitH}
-            fill={dk ? "#1a2536" : "#e8e0d4"} stroke={dk ? "#4a5a6a" : "#a09888"} strokeWidth="1" />
-          {/* Center line */}
-          <line x1={PitLeft + 16} y1={GL + FoundH + PitH / 2} x2={PitRight - 16} y2={GL + FoundH + PitH / 2}
-            stroke={dk ? "#4a5a6a" : "#b0a898"} strokeWidth="0.5" strokeDasharray="4 4" opacity="0.4" />
-          {/* Label bottom-right */}
-          <line x1={PitRight - 40} y1={GL + FoundH + PitH / 2} x2={PitRight + 36} y2={GL + FoundH + PitH / 2 + 16} stroke={lc} strokeWidth="1" />
-          <FramedLabel x={PitRight + 40} y={GL + FoundH + PitH / 2 + 20} text="Ограждение" text2="котлована" dk={dk} id="pit" hovered={hovered} />
+          {/* Left shoring wall — full depth */}
+          <rect x={ShoringLeft} y={ShoringTop} width={SheetW} height={ShoringBottom - ShoringTop}
+            fill={p("pat-sheet", "pat-sheet-dk")} stroke={dk ? "#5a7a90" : "#5a7a9a"} strokeWidth="1.5" />
+          {/* Right shoring wall — full depth */}
+          <rect x={ShoringRight - SheetW} y={ShoringTop} width={SheetW} height={ShoringBottom - ShoringTop}
+            fill={p("pat-sheet", "pat-sheet-dk")} stroke={dk ? "#5a7a90" : "#5a7a9a"} strokeWidth="1.5" />
+          {/* Pit space inside shoring (between walls, below foundation) */}
+          <rect
+            x={ShoringLeft + SheetW} y={PitTop}
+            width={ShoringRight - ShoringLeft - SheetW * 2} height={PitBottom - PitTop}
+            fill={dk ? "#141e2e" : "#e4dcd0"} stroke={dk ? "#3a4a5a" : "#a09888"} strokeWidth="0.5"
+          />
+          {/* Label right side */}
+          <FramedLabel x={ShoringRight + 30} y={ShoringTop + 30} text="Ограждение" text2="котлована" dk={dk} id="pit" hovered={hovered}
+            lineFromX={ShoringRight} lineFromY={(ShoringTop + ShoringBottom) / 2} />
         </g>
 
-        {/* ====== PILES (сваи) ====== */}
+        {/* ====== FOUNDATION (inside shoring, at top) ====== */}
+        <g {...zoneProps("foundation")}>
+          <rect x={ShoringLeft + SheetW} y={ShoringTop} width={ShoringRight - ShoringLeft - SheetW * 2} height={FoundH}
+            fill={p("pat-concrete", "pat-concrete-dk")} stroke={dk ? "#5a7a90" : "#7a8a9a"} strokeWidth="1.5" />
+          {/* Label right side, below shoring label */}
+          <FramedLabel x={ShoringRight + 30} y={ShoringTop + 80} text="Основание" dk={dk} id="foundation" hovered={hovered}
+            lineFromX={ShoringRight - SheetW - 20} lineFromY={ShoringTop + FoundH / 2} />
+        </g>
+
+        {/* ====== PILES (сваи) — below shoring ====== */}
         <g {...zoneProps("piles")}>
-          {/* Vertical piles below pit */}
           {Array.from({ length: 7 }, (_, i) => {
-            const px = PitLeft + 30 + i * ((PitRight - PitLeft - 60) / 6);
-            const pileTop = GL + FoundH + PitH;
-            const pileLen = 70 + (i % 2) * 10;
+            const px = ShoringLeft + SheetW + 20 + i * ((ShoringRight - ShoringLeft - SheetW * 2 - 40) / 6);
+            const pTop = ShoringBottom;
+            const pLen = PileDepth + (i % 2) * 12;
             return (
               <g key={`pile-${i}`}>
-                <rect x={px - 4} y={pileTop} width="8" height={pileLen} fill={p("pat-concrete", "pat-concrete-dk")} stroke={dk ? "#5a7a90" : "#7a8a9a"} strokeWidth="1" />
-                {/* Pile tip */}
-                <polygon points={`${px - 4},${pileTop + pileLen} ${px},${pileTop + pileLen + 8} ${px + 4},${pileTop + pileLen}`} fill={dk ? "#3b4a5c" : "#b0bcc8"} stroke={dk ? "#5a7a90" : "#7a8a9a"} strokeWidth="0.8" />
+                <rect x={px - 4} y={pTop} width="8" height={pLen} fill={p("pat-concrete", "pat-concrete-dk")} stroke={dk ? "#5a7a90" : "#7a8a9a"} strokeWidth="1" />
+                <polygon points={`${px - 4},${pTop + pLen} ${px},${pTop + pLen + 8} ${px + 4},${pTop + pLen}`}
+                  fill={dk ? "#3b4a5c" : "#b0bcc8"} stroke={dk ? "#5a7a90" : "#7a8a9a"} strokeWidth="0.8" />
               </g>
             );
           })}
-          {/* Label right */}
-          <line x1={PitRight - 50} y1={GL + FoundH + PitH + 35} x2={PitRight + 36} y2={GL + FoundH + PitH + 50} stroke={lc} strokeWidth="1" />
-          <FramedLabel x={PitRight + 40} y={GL + FoundH + PitH + 54} text="Сваи" dk={dk} id="piles" hovered={hovered} />
+          {/* Label right side, below foundation label */}
+          <FramedLabel x={ShoringRight + 30} y={ShoringBottom + 20} text="Сваи" dk={dk} id="piles" hovered={hovered}
+            lineFromX={ShoringRight - SheetW - 30} lineFromY={ShoringBottom + PileDepth / 2} />
         </g>
       </svg>
     </div>
