@@ -4,6 +4,7 @@ import { useProject, ProjectProvider } from "@/lib/ProjectContext";
 import { useMobile } from "@/lib/MobileContext";
 import { isGeoMode } from "@/lib/geoMode";
 import Sidebar from "./Sidebar";
+import SubscriptionBanner from "./SubscriptionBanner";
 import { AppLogo } from "./GeoLogo";
 import ProjectSwitcher from "./ProjectSwitcher";
 import NotificationBell from "./NotificationBell";
@@ -304,6 +305,8 @@ function WorkspaceContent() {
             </>
           )}
         </header>
+
+        {!geo && <SubscriptionBanner />}
 
         {/* Content */}
         <main className={`flex-1 flex flex-col min-h-0 overflow-auto ${isMobile ? "p-3" : "p-6"}`}>

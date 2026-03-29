@@ -7,6 +7,7 @@ import ProjectAccessTab from "@/components/admin/ProjectAccessTab";
 import ProjectUsersTab from "@/components/admin/ProjectUsersTab";
 import ProjectHistoryTab from "@/components/admin/ProjectHistoryTab";
 import InviteManager from "@/components/admin/InviteManager";
+import SubscriptionPanel from "@/components/admin/SubscriptionPanel";
 
 interface TabDef {
   key: string;
@@ -29,6 +30,9 @@ export default function AdminPage() {
   tabs.push({ key: "invites", label: "Приглашения" });
   tabs.push({ key: "dictionaries", label: "Справочники" });
   tabs.push({ key: "history", label: "История действий" });
+  if (isProjectAdmin || isPortalAdmin) {
+    tabs.push({ key: "subscription", label: "Подписка" });
+  }
 
   const [activeTab, setActiveTab] = useState(tabs[0]?.key || "permissions");
 
@@ -108,6 +112,7 @@ export default function AdminPage() {
       {activeTab === "invites" && <InviteManager />}
       {activeTab === "dictionaries" && <DictionaryManager />}
       {activeTab === "history" && <ProjectHistoryTab />}
+      {activeTab === "subscription" && <SubscriptionPanel />}
     </div>
   );
 }
