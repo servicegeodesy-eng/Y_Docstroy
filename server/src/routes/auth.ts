@@ -2,10 +2,16 @@ import { Router, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import rateLimit from 'express-rate-limit';
 import pool from '../config/db';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 
 const router = Router();
+
+// Rate limiting: 10 попыток входа в минуту, 3 сброса пароля в час
+const loginLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, message: { error: 'Слишком много попыток входа. Попробуйте через минуту.' } });
+const resetLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 3, message: { error: 'Слишком много запросов сброса пароля. Попробуйте через час.' } });
+const signupLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 5, message: { error: 'Слишком много регистраций. Попробуйте через час.' } });
 
 function generateAccessToken(userId: string): string {
   return jwt.sign({ userId }, process.env.JWT_SECRET!, {
@@ -33,7 +39,7 @@ function generateTempPassword(length = 8): string {
 }
 
 // POST /api/auth/login
-router.post('/login', async (req: AuthRequest, res: Response) => {
+router.post('/login', loginLimiter, async (req: AuthRequest, res: Response) => {
   try {
     const { email, password } = req.body;
 
@@ -83,7 +89,7 @@ router.post('/login', async (req: AuthRequest, res: Response) => {
 });
 
 // POST /api/auth/login-by-name
-router.post('/login-by-name', async (req: AuthRequest, res: Response) => {
+router.post('/login-by-name', loginLimiter, async (req: AuthRequest, res: Response) => {
   try {
     const { query, password } = req.body;
 
@@ -154,12 +160,24 @@ router.post('/login-by-name', async (req: AuthRequest, res: Response) => {
 });
 
 // POST /api/auth/signup
-router.post('/signup', async (req: AuthRequest, res: Response) => {
+router.post('/signup', signupLimiter, async (req: AuthRequest, res: Response) => {
   try {
-    const { email, password, last_name, first_name, middle_name, structure, organization, position, phone, project_id, company_id } = req.body;
+    const { email, password, last_name, first_name, middle_name, structure, organization, position, phone } = req.body;
 
     if (!email || !password || !last_name || !first_name) {
       res.status(400).json({ error: 'Email, пароль, фамилия и имя обязательны' });
+      return;
+    }
+
+    // Валидация email
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      res.status(400).json({ error: 'Некорректный формат email' });
+      return;
+    }
+
+    // Валидация пароля
+    if (password.length < 6) {
+      res.status(400).json({ error: 'Пароль должен быть не менее 6 символов' });
       return;
     }
 
@@ -181,20 +199,7 @@ router.post('/signup', async (req: AuthRequest, res: Response) => {
 
     const user = result.rows[0];
 
-    // Привязка к компании (если указана)
-    if (company_id) {
-      await pool.query(
-        "INSERT INTO company_members (company_id, user_id, role) VALUES ($1, $2, 'member'::company_role) ON CONFLICT (company_id, user_id) DO NOTHING",
-        [company_id, user.id]
-      );
-    }
-
-    if (project_id) {
-      await pool.query(
-        "INSERT INTO project_members (project_id, user_id, role) VALUES ($1, $2, 'member')",
-        [project_id, user.id]
-      );
-    }
+    // Привязка к проекту/компании — только через интерфейс администратора (не из signup)
 
     res.status(201).json({ user: { id: user.id, email: user.email } });
   } catch (err) {
@@ -342,40 +347,9 @@ router.post('/change-password', authMiddleware, async (req: AuthRequest, res: Re
   }
 });
 
-// POST /api/auth/reset-password
-router.post('/reset-password', async (req: AuthRequest, res: Response) => {
-  try {
-    const { email } = req.body;
-
-    if (!email) {
-      res.status(400).json({ error: 'Email обязателен' });
-      return;
-    }
-
-    const result = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
-
-    if (result.rows.length === 0) {
-      // Don't reveal whether the email exists
-      res.json({ ok: true });
-      return;
-    }
-
-    const tempPassword = generateTempPassword();
-    const password_hash = await bcrypt.hash(tempPassword, 12);
-
-    await pool.query(
-      'UPDATE users SET password_hash = $1, must_change_password = true, updated_at = NOW() WHERE id = $2',
-      [password_hash, result.rows[0].id]
-    );
-
-    // Пароль НЕ логируем — безопасность
-    console.log(`[RESET PASSWORD] Password reset for ${email}`);
-
-    res.json({ ok: true });
-  } catch (err) {
-    console.error('Reset password error:', err);
-    res.status(500).json({ error: 'Ошибка сервера' });
-  }
+// POST /api/auth/reset-password — отключён, используйте admin-reset-password
+router.post('/reset-password', (_req: AuthRequest, res: Response) => {
+  res.status(403).json({ error: 'Сброс пароля доступен только через администратора' });
 });
 
 // POST /api/auth/admin-reset-password

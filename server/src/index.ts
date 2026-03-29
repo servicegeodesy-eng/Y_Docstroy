@@ -55,8 +55,13 @@ const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(helmet());
+// CORS: поддержка списка origins через запятую (CORS_ORIGIN=https://a.com,https://b.com)
+const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173').split(',').map(s => s.trim());
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) callback(null, true);
+    else callback(new Error('CORS not allowed'));
+  },
   credentials: true,
 }));
 app.use(express.json({ limit: '1mb' }));

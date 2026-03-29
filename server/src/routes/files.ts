@@ -13,6 +13,19 @@ import { Readable } from 'stream';
 const router = Router();
 router.use(authMiddleware);
 
+// Извлечь projectId из пути файла (формат: .../projects/{projectId}/...)
+function extractProjectIdFromPath(filePath: string): string | null {
+  const match = filePath.match(/projects\/([0-9a-f-]{36})\//i);
+  return match ? match[1] : null;
+}
+
+// Проверить доступ пользователя к файлу по пути
+async function checkFileAccess(userId: string, filePath: string): Promise<boolean> {
+  const projectId = extractProjectIdFromPath(filePath);
+  if (!projectId) return true; // legacy-формат без project — пропускаем (обратная совместимость)
+  return hasProjectAccess(userId, projectId);
+}
+
 // Multer декодирует originalname как latin1 — исправляем на UTF-8
 function fixFileName(name: string): string {
   try {
@@ -259,6 +272,18 @@ router.post('/upload', upload.single('file'), async (req: AuthRequest, res: Resp
       return;
     }
 
+    // Защита от path traversal
+    if (storagePath.includes('..') || storagePath.startsWith('/')) {
+      res.status(400).json({ error: 'Недопустимый путь файла' });
+      return;
+    }
+
+    // Проверка доступа к проекту
+    if (!await checkFileAccess(req.userId!, storagePath)) {
+      res.status(403).json({ error: 'Нет доступа к проекту' });
+      return;
+    }
+
     const bucket = storagePath.includes('/projects/') ? MAIN_BUCKET : getBucketName(bucketKey || 'cell-files');
 
     await s3Client.send(new PutObjectCommand({
@@ -283,6 +308,12 @@ router.get('/download', async (req: AuthRequest, res: Response) => {
 
     if (!bucketKey || !filePath) {
       res.status(400).json({ error: 'bucket и path обязательны' });
+      return;
+    }
+
+    // Проверка доступа к проекту
+    if (!await checkFileAccess(req.userId!, filePath)) {
+      res.status(403).json({ error: 'Нет доступа к файлу' });
       return;
     }
 
@@ -327,6 +358,11 @@ router.get('/signed-url', async (req: AuthRequest, res: Response) => {
       return;
     }
 
+    if (!await checkFileAccess(req.userId!, filePath)) {
+      res.status(403).json({ error: 'Нет доступа к файлу' });
+      return;
+    }
+
     const bucket = filePath.includes('/projects/') ? MAIN_BUCKET : getBucketName(bucketKey);
     const command = new GetObjectCommand({ Bucket: bucket, Key: filePath });
     const url = await getSignedUrl(s3Client, command, { expiresIn });
@@ -346,6 +382,14 @@ router.post('/remove', async (req: AuthRequest, res: Response) => {
     if (!bucketKey || !Array.isArray(paths) || paths.length === 0) {
       res.status(400).json({ error: 'bucket и paths обязательны' });
       return;
+    }
+
+    // Проверка доступа к проекту для каждого файла
+    for (const p of paths) {
+      if (!await checkFileAccess(req.userId!, p)) {
+        res.status(403).json({ error: 'Нет доступа к файлу' });
+        return;
+      }
     }
 
     // Разделяем пути по бакетам: новый формат → MAIN_BUCKET, старый → legacy
