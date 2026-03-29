@@ -73,54 +73,41 @@ export default function DictionaryCascade({
   // Модал рисования маски (полноэкранный)
   if (showOverlayStep && linkedOverlay && overlayImageUrl) {
     return (
-      <div className="ds-overlay p-4">
-        <div className="ds-overlay-bg" />
-        <div
-          className="ds-modal w-full max-w-5xl max-h-[95vh] overflow-y-auto"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="ds-modal-header">
-            <div>
-              <h2 className="ds-modal-title">Отметить области на подложке</h2>
-              <p className="text-xs mt-0.5" style={{ color: "var(--ds-text-muted)" }}>
-                {linkedOverlay.name}
-                {drawnPolygons.length > 0 && (
-                  <span className="ml-2 font-medium" style={{ color: "var(--ds-accent)" }}>
-                    Нарисовано областей: {drawnPolygons.length}
-                  </span>
-                )}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowOverlayStep(false)}
-                className="ds-btn px-3 py-1.5 text-sm"
-              >
-                Готово
-              </button>
-              <button
-                onClick={() => setShowOverlayStep(false)}
-                className="ds-icon-btn"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
+      <div className="fixed inset-0 z-[60] flex flex-col" style={{ background: "var(--ds-surface)" }}>
+        <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid var(--ds-border)" }}>
+          <div>
+            <h2 className="text-lg font-semibold" style={{ color: "var(--ds-text)" }}>Отметить области на подложке</h2>
+            <p className="text-xs mt-0.5" style={{ color: "var(--ds-text-muted)" }}>
+              {linkedOverlay.name}
+              {drawnPolygons.length > 0 && (
+                <span className="ml-2 font-medium" style={{ color: "var(--ds-accent)" }}>
+                  Нарисовано областей: {drawnPolygons.length}
+                </span>
+              )}
+            </p>
           </div>
-          <div className="p-4">
-            <PolygonDrawer
-              imageUrl={overlayImageUrl}
-              imageWidth={linkedOverlay.width || 1000}
-              imageHeight={linkedOverlay.height || 750}
-              existingMasks={filteredExistingMasks}
-              newPolygons={drawnPolygons}
-              onRemovePolygon={removeDrawnPolygon}
-              getColorKey={getColorKey}
-              onComplete={(points) => setDrawnPolygons((prev) => [...prev, points])}
-              onCancel={() => setShowOverlayStep(false)}
-            />
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowOverlayStep(false)} className="ds-btn px-3 py-1.5 text-sm">Готово</button>
+            <button onClick={() => setShowOverlayStep(false)} className="ds-icon-btn">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
+        </div>
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <PolygonDrawer
+            imageUrl={overlayImageUrl}
+            imageWidth={linkedOverlay.width || 1000}
+            imageHeight={linkedOverlay.height || 750}
+            existingMasks={filteredExistingMasks}
+            newPolygons={drawnPolygons}
+            onRemovePolygon={removeDrawnPolygon}
+            getColorKey={getColorKey}
+            onComplete={(points) => setDrawnPolygons((prev) => [...prev, points])}
+            onCancel={() => setShowOverlayStep(false)}
+            fullscreen
+          />
         </div>
       </div>
     );

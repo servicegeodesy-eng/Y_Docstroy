@@ -421,53 +421,43 @@ function CreateRequestModal({ onClose, onCreated }: Props) {
         </form>
       </div>
 
-      {/* Редактор маски */}
+      {/* Редактор маски — fullscreen */}
       {showEditor && matchedOverlay && overlayImageUrl && (
-        <div className="ds-overlay p-4" onClick={() => setShowEditor(false)}>
-          <div className="ds-overlay-bg" />
-          <div
-            className="ds-modal w-full max-w-5xl max-h-[95vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="ds-modal-header">
-              <div>
-                <h2 className="ds-modal-title">Отметить область на подложке</h2>
-                <p className="text-xs mt-0.5" style={{ color: "var(--ds-text-muted)" }}>
-                  {matchedOverlay.name}
-                  {polygons.length > 0 && (
-                    <span className="ml-2 font-medium" style={{ color: "var(--ds-accent)" }}>
-                      Областей: {polygons.length}
-                    </span>
-                  )}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setShowEditor(false)}
-                  className="ds-btn px-3 py-1.5 text-sm"
-                >
-                  Готово
-                </button>
-                <button onClick={() => setShowEditor(false)} className="ds-icon-btn">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
+        <div className="fixed inset-0 z-[60] flex flex-col" style={{ background: "var(--ds-surface)" }}>
+          <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid var(--ds-border)" }}>
+            <div>
+              <h2 className="text-lg font-semibold" style={{ color: "var(--ds-text)" }}>Отметить область на подложке</h2>
+              <p className="text-xs mt-0.5" style={{ color: "var(--ds-text-muted)" }}>
+                {matchedOverlay.name}
+                {polygons.length > 0 && (
+                  <span className="ml-2 font-medium" style={{ color: "var(--ds-accent)" }}>
+                    Областей: {polygons.length}
+                  </span>
+                )}
+              </p>
             </div>
-            <div className="p-4">
-              <PolygonDrawer
-                imageUrl={overlayImageUrl}
-                imageWidth={matchedOverlay.width || 1000}
-                imageHeight={matchedOverlay.height || 750}
-                existingMasks={[]}
-                newPolygons={polygons}
-                onRemovePolygon={(index) => setPolygons((prev) => prev.filter((_, i) => i !== index))}
-                getColorKey={() => "blue"}
-                onComplete={(points) => setPolygons((prev) => [...prev, points])}
-                onCancel={() => setShowEditor(false)}
-              />
+            <div className="flex items-center gap-2">
+              <button onClick={() => setShowEditor(false)} className="ds-btn px-3 py-1.5 text-sm">Готово</button>
+              <button onClick={() => setShowEditor(false)} className="ds-icon-btn">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
+          </div>
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <PolygonDrawer
+              imageUrl={overlayImageUrl}
+              imageWidth={matchedOverlay.width || 1000}
+              imageHeight={matchedOverlay.height || 750}
+              existingMasks={[]}
+              newPolygons={polygons}
+              onRemovePolygon={(index) => setPolygons((prev) => prev.filter((_, i) => i !== index))}
+              getColorKey={() => "blue"}
+              onComplete={(points) => setPolygons((prev) => [...prev, points])}
+              onCancel={() => setShowEditor(false)}
+              fullscreen
+            />
           </div>
         </div>
       )}
