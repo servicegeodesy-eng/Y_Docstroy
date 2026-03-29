@@ -80,8 +80,13 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
 
     const res = await api.get<AvailableMaterial[]>("/api/installation/available-materials", params);
     if (res.data) {
-      setMaterials(res.data.map((m) => ({
-        ...m,
+      setMaterials(res.data.map((m: Record<string, unknown>) => ({
+        id: (m.order_item_id || m.id || "") as string,
+        material_name: (m.material_name || "") as string,
+        unit_name: (m.unit_short || m.unit_name || "") as string,
+        order_id: (m.order_id || "") as string,
+        order_number: String(m.order_number || ""),
+        available_qty: Number(m.available_qty || 0),
         required_qty: "",
         checked: false,
       })));
@@ -130,8 +135,7 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
       planned_date: plannedDate,
       notes: notes || null,
       materials: selectedMaterials.map((m) => ({
-        material_id: m.id,
-        order_id: m.order_id,
+        order_item_id: m.id,
         required_qty: Number(m.required_qty),
       })),
     };

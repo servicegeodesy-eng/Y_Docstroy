@@ -84,7 +84,7 @@ export default function WorkCard({ work, onClick }: Props) {
 
       {/* Material progress bars */}
       <div className="space-y-2">
-        {work.materials.slice(0, isMobile ? 2 : 4).map((mat) => {
+        {(work.materials || []).slice(0, isMobile ? 2 : 4).map((mat) => {
           const max = Math.max(mat.required_qty, 1);
           const orderedPct = Math.min((mat.ordered_qty / max) * 100, 100);
           const availablePct = Math.min((mat.available_qty / max) * 100, 100);
@@ -125,15 +125,15 @@ export default function WorkCard({ work, onClick }: Props) {
             </div>
           );
         })}
-        {work.materials.length > (isMobile ? 2 : 4) && (
+        {(work.materials || []).length > (isMobile ? 2 : 4) && (
           <p className="text-xs" style={{ color: "var(--ds-text-faint)" }}>
-            + ещё {work.materials.length - (isMobile ? 2 : 4)} позиций
+            + ещё {(work.materials || []).length - (isMobile ? 2 : 4)} позиций
           </p>
         )}
       </div>
 
       {/* Legend (compact) */}
-      {work.materials.length > 0 && (
+      {(work.materials || []).length > 0 && (
         <div className="flex items-center gap-3 mt-2 pt-2 border-t" style={{ borderColor: "var(--ds-border)" }}>
           <LegendDot color="#9ca3af" label="Заявлено" />
           <LegendDot color="#3b82f6" label="Заказано" />
