@@ -1,29 +1,21 @@
 import { useState, useCallback, useRef } from "react";
 import { api } from "@/lib/api";
 import { useMobile } from "@/lib/MobileContext";
-import type { InstallationWork, WorkMaterial } from "./WorkCard";
+import type { InstallationWork } from "./WorkCard";
+import {
+  ModalShell,
+  WorkInfo,
+  MaterialsSummaryCompact,
+  MaterialsProgressList,
+  MaterialUsageRow,
+  DispositionRow,
+  ErrorBanner,
+} from "./WorkProcessParts";
+import type { MaterialUsage, Disposition } from "./WorkProcessParts";
 
 /* ============================================================================
-   Types
+   Props
    ============================================================================ */
-
-interface MaterialUsage {
-  material_id: string;
-  material_name: string;
-  unit_name: string;
-  available_qty: number;
-  used_qty: string;
-  delivered_inline: boolean;
-}
-
-interface Disposition {
-  material_id: string;
-  material_name: string;
-  unit_name: string;
-  unused_qty: number;
-  action: "remaining" | "waste";
-  qty: string;
-}
 
 interface Props {
   work: InstallationWork;
@@ -41,23 +33,28 @@ export default function WorkProcessModal({ work, onClose, onUpdated }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [phase, setPhase] = useState<"process" | "complete">("process");
 
-  // Photos
+  /* --- Photos --- */
   const [photos, setPhotos] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
-  // Material usage
+  /* --- Material usage --- */
   const [usages, setUsages] = useState<MaterialUsage[]>(() =>
-    ((work.materials || []) || []).map((m) => ({
-      material_id: m.id,
+    (work.materials || []).map((m) => ({
+      id: m.id,
+      order_item_id: m.order_item_id,
       material_name: m.material_name,
-      unit_name: m.unit_short,
+      unit_short: m.unit_short,
+      required_qty: m.required_qty,
       available_qty: m.available_qty,
-      used_qty: "",
-      delivered_inline: false,
+      used_qty: m.used_qty,
+      session_qty: "",
+      showDeliveryForm: false,
+      delivery_qty: "",
     }))
   );
 
-  // Dispositions (for completing)
+  /* --- Dispositions (complete phase) --- */
   const [dispositions, setDispositions] = useState<Disposition[]>([]);
 
   /* ---------- Handlers ---------- */
@@ -75,44 +72,49 @@ export default function WorkProcessModal({ work, onClose, onUpdated }: Props) {
     onUpdated();
   };
 
-  const updateUsage = (materialId: string, field: keyof MaterialUsage, val: string | boolean) => {
-    setUsages((prev) =>
-      prev.map((u) => u.material_id === materialId ? { ...u, [field]: val } : u)
-    );
+  const updateUsage = (id: string, patch: Partial<MaterialUsage>) => {
+    setUsages((prev) => prev.map((u) => (u.id === id ? { ...u, ...patch } : u)));
   };
 
-  const handleUseMaterial = async (materialId: string) => {
-    const usage = usages.find((u) => u.material_id === materialId);
-    if (!usage || !usage.used_qty || Number(usage.used_qty) <= 0) return;
+  const handleUseMaterial = async (u: MaterialUsage) => {
+    const qty = Number(u.session_qty);
+    if (!qty || qty <= 0) return;
 
     setLoading(true);
     setError(null);
     const res = await api.post(`/api/installation/works/${work.id}/use-material`, {
-      material_id: materialId,
-      quantity: Number(usage.used_qty),
+      installation_material_id: u.id,
+      quantity: qty,
     });
     if (res.error) {
       setError(res.error);
+      setLoading(false);
+      return;
     }
     setLoading(false);
     onUpdated();
   };
 
-  const handleInlineDelivery = async (materialId: string) => {
+  const handleDelivery = async (u: MaterialUsage) => {
+    const qty = Number(u.delivery_qty);
+    if (!qty || qty <= 0) return;
+
     setLoading(true);
     setError(null);
     const res = await api.post("/api/materials/deliveries", {
-      work_id: work.id,
-      material_id: materialId,
+      items: [{ order_item_id: u.order_item_id, quantity: qty }],
     });
     if (res.error) {
       setError(res.error);
-    } else {
-      updateUsage(materialId, "delivered_inline", true);
+      setLoading(false);
+      return;
     }
+    updateUsage(u.id, { showDeliveryForm: false, delivery_qty: "" });
     setLoading(false);
     onUpdated();
   };
+
+  /* --- Photos --- */
 
   const handlePhotoAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -127,40 +129,37 @@ export default function WorkProcessModal({ work, onClose, onUpdated }: Props) {
 
   const handlePhotoDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    if (e.dataTransfer.files) {
-      const imageFiles = Array.from(e.dataTransfer.files).filter((f) =>
-        f.type.startsWith("image/")
-      );
-      setPhotos((prev) => [...prev, ...imageFiles]);
-    }
+    const imageFiles = Array.from(e.dataTransfer.files).filter((f) =>
+      f.type.startsWith("image/")
+    );
+    if (imageFiles.length) setPhotos((prev) => [...prev, ...imageFiles]);
   }, []);
 
+  /* --- Complete --- */
+
   const prepareComplete = () => {
-    // Calculate unused quantities for disposition
     const disps: Disposition[] = (work.materials || [])
       .map((m) => {
-        const usage = usages.find((u) => u.material_id === m.id);
-        const usedQty = usage ? Number(usage.used_qty) || 0 : m.used_qty;
-        const unused = m.available_qty - usedQty;
-        if (unused <= 0) return null;
+        const totalUsed = usages.find((u) => u.id === m.id)?.used_qty ?? m.used_qty;
+        const unused = m.available_qty - totalUsed;
+        if (unused <= 0 || !m.order_item_id) return null;
         return {
-          material_id: m.id,
+          order_item_id: m.order_item_id,
           material_name: m.material_name,
-          unit_name: m.unit_short,
+          unit_short: m.unit_short,
           unused_qty: unused,
           action: "remaining" as const,
           qty: String(unused),
         };
       })
       .filter(Boolean) as Disposition[];
-
     setDispositions(disps);
     setPhase("complete");
   };
 
-  const updateDisposition = (materialId: string, field: "action" | "qty", val: string) => {
+  const updateDisposition = (oid: string, field: "action" | "qty", val: string) => {
     setDispositions((prev) =>
-      prev.map((d) => d.material_id === materialId ? { ...d, [field]: val } : d)
+      prev.map((d) => (d.order_item_id === oid ? { ...d, [field]: val } : d))
     );
   };
 
@@ -168,21 +167,18 @@ export default function WorkProcessModal({ work, onClose, onUpdated }: Props) {
     setLoading(true);
     setError(null);
 
-    // Upload photos first
-    if (photos.length > 0) {
-      for (const photo of photos) {
-        const fd = new FormData();
-        fd.append("file", photo);
-        fd.append("work_id", work.id);
-        await api.upload("/api/installation/works/photos", fd);
-      }
+    for (const photo of photos) {
+      const fd = new FormData();
+      fd.append("file", photo);
+      fd.append("work_id", work.id);
+      await api.upload("/api/installation/works/photos", fd);
     }
 
     const res = await api.post(`/api/installation/works/${work.id}/complete`, {
       dispositions: dispositions.map((d) => ({
-        material_id: d.material_id,
-        action: d.action,
+        order_item_id: d.order_item_id,
         quantity: Number(d.qty),
+        disposition: d.action,
       })),
     });
 
@@ -191,12 +187,11 @@ export default function WorkProcessModal({ work, onClose, onUpdated }: Props) {
       setLoading(false);
       return;
     }
-
     setLoading(false);
     onUpdated();
   };
 
-  /* ---------- Render: Planned ---------- */
+  /* ========== Render: Planned ========== */
 
   if (work.status === "planned") {
     return (
@@ -204,12 +199,14 @@ export default function WorkProcessModal({ work, onClose, onUpdated }: Props) {
         <div className="px-5 py-4 space-y-4">
           {error && <ErrorBanner message={error} />}
           <WorkInfo work={work} />
+          <MaterialsSummaryCompact materials={work.materials || []} />
           <div className="text-center py-4">
             <p className="text-sm mb-4" style={{ color: "var(--ds-text-muted)" }}>
-              Работа запланирована на {new Date(work.planned_date).toLocaleDateString("ru-RU")}
+              Работа запланирована на{" "}
+              {new Date(work.planned_date).toLocaleDateString("ru-RU")}
             </p>
             <button
-              className="ds-btn text-sm px-6 py-2.5"
+              className="ds-btn text-sm px-8 py-3"
               onClick={handleStart}
               disabled={loading}
             >
@@ -221,14 +218,24 @@ export default function WorkProcessModal({ work, onClose, onUpdated }: Props) {
     );
   }
 
-  /* ---------- Render: Completed ---------- */
+  /* ========== Render: Completed ========== */
 
   if (work.status === "completed") {
     return (
       <ModalShell title={`Работа #${work.work_number}`} onClose={onClose} isMobile={isMobile}>
         <div className="px-5 py-4 space-y-4">
           <WorkInfo work={work} />
-          <MaterialsSummary materials={(work.materials || [])} />
+          {work.completed_at && (
+            <div>
+              <p className="text-xs font-medium" style={{ color: "var(--ds-text-muted)" }}>
+                Завершено
+              </p>
+              <p className="text-sm" style={{ color: "var(--ds-text)" }}>
+                {new Date(work.completed_at).toLocaleDateString("ru-RU")}
+              </p>
+            </div>
+          )}
+          <MaterialsProgressList materials={work.materials || []} />
           <div className="flex justify-end pt-2">
             <button className="ds-btn-secondary text-sm px-4 py-2" onClick={onClose}>
               Закрыть
@@ -239,7 +246,7 @@ export default function WorkProcessModal({ work, onClose, onUpdated }: Props) {
     );
   }
 
-  /* ---------- Render: In Progress - Complete phase ---------- */
+  /* ========== Render: In Progress - Complete phase ========== */
 
   if (phase === "complete") {
     return (
@@ -258,50 +265,11 @@ export default function WorkProcessModal({ work, onClose, onUpdated }: Props) {
               </p>
               <div className="space-y-3">
                 {dispositions.map((d) => (
-                  <div
-                    key={d.material_id}
-                    className="p-3 rounded-lg space-y-2"
-                    style={{ background: "var(--ds-surface-sunken)" }}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium" style={{ color: "var(--ds-text)" }}>
-                        {d.material_name}
-                      </span>
-                      <span className="text-xs" style={{ color: "var(--ds-text-faint)" }}>
-                        Остаток: {d.unused_qty} {d.unit_name}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <label className="flex items-center gap-1.5 text-sm cursor-pointer" style={{ color: "var(--ds-text)" }}>
-                        <input
-                          type="radio"
-                          name={`disp-${d.material_id}`}
-                          checked={d.action === "remaining"}
-                          onChange={() => updateDisposition(d.material_id, "action", "remaining")}
-                        />
-                        В остатки
-                      </label>
-                      <label className="flex items-center gap-1.5 text-sm cursor-pointer" style={{ color: "var(--ds-text)" }}>
-                        <input
-                          type="radio"
-                          name={`disp-${d.material_id}`}
-                          checked={d.action === "waste"}
-                          onChange={() => updateDisposition(d.material_id, "action", "waste")}
-                        />
-                        В утиль
-                      </label>
-                      <input
-                        type="number"
-                        className="ds-input text-sm"
-                        style={{ width: "90px" }}
-                        min="0"
-                        max={d.unused_qty}
-                        step="0.01"
-                        value={d.qty}
-                        onChange={(e) => updateDisposition(d.material_id, "qty", e.target.value)}
-                      />
-                    </div>
-                  </div>
+                  <DispositionRow
+                    key={d.order_item_id}
+                    d={d}
+                    onChange={updateDisposition}
+                  />
                 ))}
               </div>
             </>
@@ -319,6 +287,7 @@ export default function WorkProcessModal({ work, onClose, onUpdated }: Props) {
               className="ds-btn text-sm px-4 py-2"
               onClick={handleComplete}
               disabled={loading}
+              style={{ background: "#22c55e" }}
             >
               {loading ? "Завершение..." : "Завершить монтаж"}
             </button>
@@ -328,87 +297,57 @@ export default function WorkProcessModal({ work, onClose, onUpdated }: Props) {
     );
   }
 
-  /* ---------- Render: In Progress - Main ---------- */
+  /* ========== Render: In Progress - Main ========== */
 
   return (
     <ModalShell title={`Работа #${work.work_number}`} onClose={onClose} isMobile={isMobile}>
-      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
         {error && <ErrorBanner message={error} />}
         <WorkInfo work={work} />
 
-        {/* Photo section */}
-        <div>
-          <label className="block text-xs font-medium mb-2" style={{ color: "var(--ds-text-muted)" }}>
-            Фото
-          </label>
-          <div
-            className="border-2 border-dashed rounded-lg p-4 text-center transition-colors"
-            style={{ borderColor: "var(--ds-border)", background: "var(--ds-surface-sunken)" }}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={handlePhotoDrop}
-          >
-            {photos.length > 0 ? (
-              <div className="flex flex-wrap gap-2 mb-2">
-                {photos.map((f, i) => (
-                  <span
-                    key={i}
-                    className="text-xs px-2 py-1 rounded-lg flex items-center gap-1"
-                    style={{ background: "var(--ds-surface)", color: "var(--ds-text)" }}
-                  >
-                    {f.name}
-                    <button onClick={() => removePhoto(i)}>
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm mb-2" style={{ color: "var(--ds-text-faint)" }}>
-                Перетащите фото сюда или нажмите кнопку
-              </p>
-            )}
-            <button
-              className="ds-btn-secondary text-xs px-3 py-1.5"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              + Добавить фото
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              className="hidden"
-              accept="image/*"
-              multiple
-              capture="environment"
-              onChange={handlePhotoAdd}
-            />
-          </div>
-        </div>
+        {/* ---- Photo section ---- */}
+        <PhotoSection
+          photos={photos}
+          onAdd={handlePhotoAdd}
+          onRemove={removePhoto}
+          onDrop={handlePhotoDrop}
+          cameraInputRef={cameraInputRef}
+          fileInputRef={fileInputRef}
+        />
 
-        {/* Materials usage */}
-        <div>
-          <label className="block text-xs font-medium mb-2" style={{ color: "var(--ds-text-muted)" }}>
+        {/* ---- Materials section ---- */}
+        <section>
+          <label
+            className="block text-xs font-medium mb-2"
+            style={{ color: "var(--ds-text-muted)" }}
+          >
             Материалы
           </label>
           <div className="space-y-2">
-            {usages.map((usage) => (
+            {usages.map((u) => (
               <MaterialUsageRow
-                key={usage.material_id}
-                usage={usage}
+                key={u.id}
+                u={u}
                 loading={loading}
-                onChangeQty={(val) => updateUsage(usage.material_id, "used_qty", val)}
-                onUse={() => handleUseMaterial(usage.material_id)}
-                onInlineDelivery={() => handleInlineDelivery(usage.material_id)}
+                onUpdate={(patch) => updateUsage(u.id, patch)}
+                onUse={() => handleUseMaterial(u)}
+                onDelivery={() => handleDelivery(u)}
               />
             ))}
+            {usages.length === 0 && (
+              <p className="text-sm py-2" style={{ color: "var(--ds-text-faint)" }}>
+                Нет материалов
+              </p>
+            )}
           </div>
-        </div>
+        </section>
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-end gap-2 px-5 py-4 border-t" style={{ borderColor: "var(--ds-border)" }}>
+      <div
+        className="flex items-center justify-end gap-2 px-5 py-4 border-t"
+        style={{ borderColor: "var(--ds-border)" }}
+      >
         <button className="ds-btn-secondary text-sm px-4 py-2" onClick={onClose}>
           Закрыть
         </button>
@@ -426,162 +365,92 @@ export default function WorkProcessModal({ work, onClose, onUpdated }: Props) {
 }
 
 /* ============================================================================
-   Sub-components
+   PhotoSection (local sub-component)
    ============================================================================ */
 
-function ModalShell({ title, onClose, isMobile, children }: {
-  title: string;
-  onClose: () => void;
-  isMobile: boolean;
-  children: React.ReactNode;
+function PhotoSection({
+  photos,
+  onAdd,
+  onRemove,
+  onDrop,
+  cameraInputRef,
+  fileInputRef,
+}: {
+  photos: File[];
+  onAdd: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onRemove: (idx: number) => void;
+  onDrop: (e: React.DragEvent) => void;
+  cameraInputRef: React.RefObject<HTMLInputElement | null>;
+  fileInputRef: React.RefObject<HTMLInputElement | null>;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.5)" }}>
-      <div
-        className="w-full rounded-xl shadow-xl overflow-hidden flex flex-col"
-        style={{
-          maxWidth: isMobile ? "100%" : "640px",
-          maxHeight: "90vh",
-          background: "var(--ds-surface)",
-        }}
+    <section>
+      <label
+        className="block text-xs font-medium mb-2"
+        style={{ color: "var(--ds-text-muted)" }}
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "var(--ds-border)" }}>
-          <h3 className="font-semibold text-base" style={{ color: "var(--ds-text)" }}>{title}</h3>
-          <button className="ds-icon-btn" onClick={onClose}>
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function WorkInfo({ work }: { work: InstallationWork }) {
-  const locationParts = [
-    work.building_name,
-    work.work_type_name,
-    work.floor_name,
-    work.construction_name,
-  ].filter(Boolean);
-
-  return (
-    <div className="space-y-2">
-      <div>
-        <p className="text-xs font-medium" style={{ color: "var(--ds-text-muted)" }}>Место</p>
-        <p className="text-sm" style={{ color: "var(--ds-text)" }}>{locationParts.join(" / ")}</p>
-      </div>
-      <div className="flex gap-6">
-        <div>
-          <p className="text-xs font-medium" style={{ color: "var(--ds-text-muted)" }}>Плановая дата</p>
-          <p className="text-sm" style={{ color: "var(--ds-text)" }}>
-            {new Date(work.planned_date).toLocaleDateString("ru-RU")}
+        Фото
+      </label>
+      <div
+        className="border-2 border-dashed rounded-lg p-4 text-center transition-colors"
+        style={{ borderColor: "var(--ds-border)", background: "var(--ds-surface-sunken)" }}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={onDrop}
+      >
+        {photos.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-3">
+            {photos.map((f, i) => (
+              <span
+                key={i}
+                className="text-xs px-2 py-1 rounded-lg flex items-center gap-1"
+                style={{ background: "var(--ds-surface)", color: "var(--ds-text)" }}
+              >
+                {f.name}
+                <button onClick={() => onRemove(i)} aria-label="Удалить">
+                  <svg width={12} height={12} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+        {photos.length === 0 && (
+          <p className="text-sm mb-2" style={{ color: "var(--ds-text-faint)" }}>
+            Перетащите фото сюда или нажмите кнопку
           </p>
-        </div>
-        <div>
-          <p className="text-xs font-medium" style={{ color: "var(--ds-text-muted)" }}>Автор</p>
-          <p className="text-sm" style={{ color: "var(--ds-text)" }}>{work.created_by_name}</p>
-        </div>
-      </div>
-      {work.notes && (
-        <div>
-          <p className="text-xs font-medium" style={{ color: "var(--ds-text-muted)" }}>Примечание</p>
-          <p className="text-sm" style={{ color: "var(--ds-text)" }}>{work.notes}</p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function MaterialsSummary({ materials }: { materials: WorkMaterial[] }) {
-  return (
-    <div>
-      <p className="text-xs font-medium mb-2" style={{ color: "var(--ds-text-muted)" }}>Материалы</p>
-      <div className="space-y-2">
-        {materials.map((m) => {
-          const pct = m.required_qty > 0 ? Math.min((m.used_qty / m.required_qty) * 100, 100) : 0;
-          return (
-            <div key={m.id} className="p-3 rounded-lg" style={{ background: "var(--ds-surface-sunken)" }}>
-              <div className="flex justify-between mb-1">
-                <span className="text-sm font-medium" style={{ color: "var(--ds-text)" }}>{m.material_name}</span>
-                <span className="text-xs" style={{ color: "var(--ds-text-muted)" }}>
-                  {m.used_qty}/{m.required_qty} {m.unit_short}
-                </span>
-              </div>
-              <div className="h-2 rounded-full overflow-hidden" style={{ background: "var(--ds-border)" }}>
-                <div
-                  className="h-full rounded-full"
-                  style={{ width: `${pct}%`, background: pct >= 100 ? "#22c55e" : "#f59e0b" }}
-                />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function MaterialUsageRow({ usage, loading, onChangeQty, onUse, onInlineDelivery }: {
-  usage: MaterialUsage;
-  loading: boolean;
-  onChangeQty: (val: string) => void;
-  onUse: () => void;
-  onInlineDelivery: () => void;
-}) {
-  const notDelivered = usage.available_qty <= 0 && !usage.delivered_inline;
-
-  return (
-    <div className="p-3 rounded-lg" style={{ background: "var(--ds-surface-sunken)" }}>
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-sm font-medium" style={{ color: "var(--ds-text)" }}>
-          {usage.material_name}
-        </span>
-        <span className="text-xs" style={{ color: "var(--ds-text-muted)" }}>
-          Доступно: {usage.available_qty} {usage.unit_name}
-        </span>
-      </div>
-
-      {notDelivered ? (
-        <button
-          className="text-xs underline"
-          style={{ color: "var(--ds-accent)" }}
-          onClick={onInlineDelivery}
-          disabled={loading}
-        >
-          Зафиксировать поступление
-        </button>
-      ) : (
-        <div className="flex items-center gap-2">
-          <input
-            type="number"
-            className="ds-input text-sm flex-1"
-            min="0"
-            max={usage.available_qty}
-            step="0.01"
-            placeholder="Использовано"
-            value={usage.used_qty}
-            onChange={(e) => onChangeQty(e.target.value)}
-          />
+        )}
+        <div className="flex items-center justify-center gap-2">
           <button
-            className="ds-btn text-xs px-3 py-1.5 whitespace-nowrap"
-            onClick={onUse}
-            disabled={loading || !usage.used_qty || Number(usage.used_qty) <= 0}
+            className="ds-btn text-xs px-3 py-1.5"
+            onClick={() => cameraInputRef.current?.click()}
           >
-            Зафиксировать
+            Сделать фото
+          </button>
+          <button
+            className="ds-btn-secondary text-xs px-3 py-1.5"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            Прикрепить файл
           </button>
         </div>
-      )}
-    </div>
-  );
-}
-
-function ErrorBanner({ message }: { message: string }) {
-  return (
-    <div className="text-sm px-3 py-2 rounded-lg" style={{ background: "color-mix(in srgb, #ef4444 10%, var(--ds-surface))", color: "#ef4444" }}>
-      {message}
-    </div>
+        <input
+          ref={cameraInputRef}
+          type="file"
+          className="hidden"
+          accept="image/*"
+          capture="environment"
+          onChange={onAdd}
+        />
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          accept="image/*"
+          multiple
+          onChange={onAdd}
+        />
+      </div>
+    </section>
   );
 }
