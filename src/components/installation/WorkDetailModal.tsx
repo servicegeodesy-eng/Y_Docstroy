@@ -169,10 +169,15 @@ export default function WorkDetailModal({ workId, onClose, onUpdated }: Props) {
           </div>
           {work.notes && <p className="text-sm" style={{ color: "var(--ds-text-muted)" }}>{work.notes}</p>}
 
-          {/* Actions */}
-          {isPlanned && (
-            <button onClick={handleStart} disabled={actionLoading} className="ds-btn text-sm">{actionLoading ? "..." : "Начать процесс"}</button>
-          )}
+          {/* Actions — Начать / Завершить монтаж */}
+          <div className="flex items-center gap-2">
+            {isPlanned && (
+              <button onClick={handleStart} disabled={actionLoading} className="ds-btn text-sm">{actionLoading ? "..." : "Начать процесс"}</button>
+            )}
+            {isInProgress && !showComplete && (
+              <button onClick={prepareComplete} disabled={actionLoading} className="ds-btn-secondary text-xs px-3 py-1.5" style={{ color: "#22c55e", borderColor: "#22c55e" }}>Завершить монтаж</button>
+            )}
+          </div>
 
           {/* Materials */}
           {work.materials.length > 0 && (
@@ -187,40 +192,45 @@ export default function WorkDetailModal({ workId, onClose, onUpdated }: Props) {
                         <span className="text-sm font-medium" style={{ color: "var(--ds-text)" }}>{mat.material_name}</span>
                         <span className="text-xs" style={{ color: "var(--ds-text-muted)" }}>{mat.used_qty}/{mat.available_qty}/{mat.required_qty} {mat.unit_short}</span>
                       </div>
-                      <div className="space-y-0.5 mb-1">
+                      <div className="space-y-0.5 mb-2">
                         <Bar label="Нужно" val={mat.required_qty} max={mat.required_qty} color="#9ca3af" />
                         <Bar label="В наличии" val={mat.available_qty} max={mat.required_qty} color="#22c55e" />
                         <Bar label="Использовано" val={mat.used_qty} max={mat.required_qty} color="#f59e0b" />
                       </div>
                       {isInProgress && (
-                        <div className="flex items-center gap-2 pt-2" style={{ borderTop: "1px solid var(--ds-border)" }}>
-                          <input className="ds-input w-20 text-xs text-center" type="number" min="0" max={remaining} step="0.01" placeholder="Кол-во"
-                            value={usageAmounts[mat.id] || ""} onChange={e => setUsageAmounts(p => ({ ...p, [mat.id]: e.target.value }))} />
-                          <button onClick={() => handleUseMaterial(mat.id)} disabled={actionLoading || !usageAmounts[mat.id]} className="ds-btn text-xs px-2 py-1">Зафиксировать</button>
-                          {remaining < mat.required_qty - mat.used_qty && mat.order_item_id && (
+                        <>
+                          {/* Фиксация использования */}
+                          <div className="flex items-center gap-3 pt-2 mb-2" style={{ borderTop: "1px solid var(--ds-border)" }}>
+                            <input className="ds-input flex-1 text-sm text-center" type="number" min="0" max={remaining} step="0.01" placeholder="Укажите количество"
+                              value={usageAmounts[mat.id] || ""} onChange={e => setUsageAmounts(p => ({ ...p, [mat.id]: e.target.value }))} />
+                          </div>
+                          <button onClick={() => handleUseMaterial(mat.id)} disabled={actionLoading || !usageAmounts[mat.id]}
+                            className="ds-btn w-full text-sm py-2 mb-2">Зафиксировать процесс</button>
+
+                          {/* Фиксация поступления */}
+                          {mat.order_item_id && (
                             showDelivery === mat.id ? (
-                              <div className="flex items-center gap-1">
-                                <input className="ds-input w-16 text-xs text-center" type="number" min="0" placeholder="Кол-во"
+                              <div className="flex items-center gap-2">
+                                <input className="ds-input flex-1 text-sm text-center" type="number" min="0" placeholder="Количество поступления"
                                   value={deliveryAmounts[mat.order_item_id] || ""} onChange={e => setDeliveryAmounts(p => ({ ...p, [mat.order_item_id!]: e.target.value }))} />
-                                <button onClick={() => handleDelivery(mat.order_item_id!)} disabled={actionLoading} className="ds-btn-secondary text-xs px-2 py-1">OK</button>
-                                <button onClick={() => setShowDelivery(null)} className="text-xs" style={{ color: "var(--ds-text-faint)" }}>✕</button>
+                                <button onClick={() => handleDelivery(mat.order_item_id!)} disabled={actionLoading} className="ds-btn text-xs px-3 py-1.5">OK</button>
+                                <button onClick={() => setShowDelivery(null)} className="ds-icon-btn">
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
                               </div>
                             ) : (
-                              <button onClick={() => setShowDelivery(mat.id)} className="text-xs underline" style={{ color: "var(--ds-accent)" }}>Поступление</button>
+                              <button onClick={() => setShowDelivery(mat.id)} className="ds-btn-secondary w-full text-xs py-1.5">
+                                Зафиксировать поступление материалов
+                              </button>
                             )
                           )}
-                        </div>
+                        </>
                       )}
                     </div>
                   );
                 })}
               </div>
             </div>
-          )}
-
-          {/* Complete */}
-          {isInProgress && !showComplete && (
-            <button onClick={prepareComplete} disabled={actionLoading} className="ds-btn text-sm" style={{ background: "#22c55e" }}>Завершить монтаж</button>
           )}
           {showComplete && (
             <div className="p-4 rounded-lg" style={{ background: "var(--ds-surface-sunken)" }}>
