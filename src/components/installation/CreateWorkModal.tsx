@@ -304,6 +304,25 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
           </button>
         </div>
 
+        {/* Уведомления о недостающих данных */}
+        {(() => {
+          const warnings: string[] = [];
+          if (!selBuilding) warnings.push("Выберите место работ");
+          if (!selWorkType) warnings.push("Выберите вид работ");
+          if (linkedOverlay && drawnPolygons.length === 0) warnings.push("Отметьте область на подложке");
+          if (!linkedOverlay && selWorkType) warnings.push("Нет связанной подложки для выбранного вида работ");
+          if (validItems.length === 0) warnings.push("Укажите необходимые материалы");
+          if (validItems.length > 0 && !allBalanced) warnings.push("Выберите заявки для всех материалов (количество должно совпадать)");
+          if (warnings.length === 0) return null;
+          return (
+            <div className="px-6 py-2 text-xs space-y-0.5" style={{ background: "color-mix(in srgb, #f59e0b 10%, var(--ds-surface))", borderBottom: "1px solid var(--ds-border)" }}>
+              {warnings.map((w, i) => (
+                <p key={i} style={{ color: "#b45309" }}>{w} <span style={{ color: "#ef4444" }}>*</span></p>
+              ))}
+            </div>
+          );
+        })()}
+
         {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto p-6 space-y-5">
 

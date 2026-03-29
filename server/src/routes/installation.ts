@@ -324,9 +324,10 @@ router.get('/available-materials', async (req: AuthRequest, res: Response) => {
       SELECT moi.id as order_item_id, moi.quantity as ordered_qty, moi.delivered_qty,
              dm.name as material_name, du.short_name as unit_short,
              mo.order_number, mo.id as order_id, mo.status as order_status,
-             moi.quantity - coalesce((
-               SELECT sum(im.required_qty) FROM installation_materials im WHERE im.order_item_id = moi.id
-             ), 0) as available_qty
+             GREATEST(0, moi.quantity
+               - coalesce((SELECT sum(im.required_qty) FROM installation_materials im WHERE im.order_item_id = moi.id), 0)
+               + coalesce((SELECT sum(md.quantity) FROM material_dispositions md WHERE md.order_item_id = moi.id AND md.disposition = 'returned'), 0)
+             ) as available_qty
       FROM material_order_items moi
       JOIN material_orders mo ON mo.id = moi.order_id
       JOIN dict_materials dm ON dm.id = moi.material_id
