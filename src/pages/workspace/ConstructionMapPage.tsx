@@ -290,7 +290,7 @@ export default function ConstructionMapPage() {
             return <line key={`rt-${t}`} x1={RoofLeft+(mid-RoofLeft)*(1-t)+10} y1={ly} x2={RoofRight-(RoofRight-mid)*(1-t)-10} y2={ly} stroke={dk ? "#4a6888" : "#4a6888"} strokeWidth="0.6" opacity="0.4" />;
           })}
           <FramedLabel x={lcX} y={aboveY.roof} text="Кровля" dk={dk} id="roof" hovered={hovered}
-            lineFromX={RoofRight - 60} lineFromY={RoofPeak + (BY - RoofPeak) * 0.15} />
+            lineFromX={(RoofLeft + RoofRight) / 2 - 20} lineFromY={RoofPeak + (BY - RoofPeak) * 0.35} />
         </g>
 
         {/* EARTHWORK — RIGHT side */}
