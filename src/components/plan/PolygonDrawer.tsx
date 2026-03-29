@@ -65,25 +65,33 @@ export default function PolygonDrawer({
     ...newPolygons,
   ];
 
-  /** Преобразовать координаты мыши → нормализованные 0-1 с учётом zoom/pan */
+  /** Преобразовать координаты мыши → нормализованные 0-1 с учётом zoom/pan и preserveAspectRatio */
   const toNormalized = useCallback(
     (e: React.MouseEvent<SVGSVGElement>): Point | null => {
       const svg = svgRef.current;
       if (!svg) return null;
+
+      // Используем SVG matrix для точного преобразования (учитывает preserveAspectRatio letterbox)
+      const ctm = svg.getScreenCTM();
+      if (ctm) {
+        const pt = svg.createSVGPoint();
+        pt.x = e.clientX;
+        pt.y = e.clientY;
+        const svgPt = pt.matrixTransform(ctm.inverse());
+        const x = svgPt.x / aspectW;
+        const y = svgPt.y / aspectH;
+        return { x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) };
+      }
+
+      // Fallback без CTM
       const rect = svg.getBoundingClientRect();
-      // Position relative to SVG element
       const relX = (e.clientX - rect.left) / rect.width;
       const relY = (e.clientY - rect.top) / rect.height;
-      // Account for viewBox transform (pan + zoom)
       const vbW = aspectW / zoom;
       const vbH = aspectH / zoom;
-      const vbX = pan.x;
-      const vbY = pan.y;
-      const absX = vbX + relX * vbW;
-      const absY = vbY + relY * vbH;
-      const x = absX / aspectW;
-      const y = absY / aspectH;
-      return { x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) };
+      const absX = pan.x + relX * vbW;
+      const absY = pan.y + relY * vbH;
+      return { x: Math.max(0, Math.min(1, absX / aspectW)), y: Math.max(0, Math.min(1, absY / aspectH)) };
     },
     [aspectW, aspectH, zoom, pan],
   );
