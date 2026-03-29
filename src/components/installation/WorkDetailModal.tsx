@@ -163,7 +163,7 @@ export default function WorkDetailModal({ workId, onClose, onUpdated }: Props) {
           {/* Info */}
           <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
             <div><span className="text-xs" style={{ color: "var(--ds-text-faint)" }}>Место</span><p style={{ color: "var(--ds-text)" }}>{location}</p></div>
-            <div><span className="text-xs" style={{ color: "var(--ds-text-faint)" }}>Плановая дата</span><p style={{ color: "var(--ds-text)" }}>{work.planned_date || "—"}</p></div>
+            <div><span className="text-xs" style={{ color: "var(--ds-text-faint)" }}>Плановая дата</span><p style={{ color: "var(--ds-text)" }}>{work.planned_date ? new Date(work.planned_date).toLocaleDateString("ru") : "—"}</p></div>
             {work.started_at && <div><span className="text-xs" style={{ color: "var(--ds-text-faint)" }}>Начато</span><p style={{ color: "var(--ds-text)" }}>{new Date(work.started_at).toLocaleString("ru")}</p></div>}
             {work.completed_at && <div><span className="text-xs" style={{ color: "var(--ds-text-faint)" }}>Завершено</span><p style={{ color: "var(--ds-text)" }}>{new Date(work.completed_at).toLocaleString("ru")}</p></div>}
           </div>

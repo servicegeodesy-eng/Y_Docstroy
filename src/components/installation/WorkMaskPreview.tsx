@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
-import { api } from "@/lib/api";
-import { getOverlayUrl } from "@/lib/overlayUrlCache";
 import { supabase } from "@/lib/supabase";
+import { getOverlayUrl } from "@/lib/overlayUrlCache";
 
 interface MaskData {
   id: string;
@@ -33,13 +32,19 @@ export default function WorkMaskPreview({ workId }: Props) {
     async function load() {
       setLoading(true);
 
-      // Загружаем маски работы
+      // Загружаем маски работы через generic CRUD
       const maskRes = await supabase
         .from("cell_overlay_masks")
         .select("id, overlay_id, polygon_points")
         .eq("work_id", workId);
 
-      const workMasks = (maskRes.data || []) as MaskData[];
+      // polygon_points может прийти как строка — парсим
+      const workMasks: MaskData[] = (maskRes.data || []).map((m: Record<string, unknown>) => ({
+        id: m.id as string,
+        overlay_id: m.overlay_id as string,
+        polygon_points: typeof m.polygon_points === "string" ? JSON.parse(m.polygon_points) : m.polygon_points as { x: number; y: number }[],
+      }));
+
       if (cancelled) return;
 
       if (workMasks.length === 0) {
@@ -81,7 +86,15 @@ export default function WorkMaskPreview({ workId }: Props) {
     );
   }
 
-  if (!overlay || !imageUrl || masks.length === 0) return null;
+  if (masks.length === 0) {
+    return (
+      <div className="rounded-lg border p-4 text-center" style={{ borderColor: "var(--ds-border)", background: "var(--ds-surface-sunken)" }}>
+        <p className="text-xs" style={{ color: "var(--ds-text-faint)" }}>Область на подложке не задана</p>
+      </div>
+    );
+  }
+
+  if (!overlay || !imageUrl) return null;
 
   const aspectW = 1000;
   const aspectH = (overlay.height / overlay.width) * aspectW;
