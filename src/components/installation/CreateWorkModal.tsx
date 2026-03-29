@@ -1,33 +1,28 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { api } from "@/lib/api";
 import { useProject } from "@/lib/ProjectContext";
 import { useDictionaries } from "@/hooks/useDictionaries";
 import { useDictLinks, filterChildren, compositeKey, hasLinkedChildren, isChildLocked } from "@/hooks/useDictLinks";
 import { useMobile } from "@/lib/MobileContext";
+import CreateOrderModal from "@/components/materials/CreateOrderModal";
 
+interface NomenclatureItem { id: string; name: string }
+interface UnitItem { id: string; name: string }
+interface RequiredMaterialRow {
+  key: number; material_name: string; material_id: string | null;
+  unit_id: string; unit_name: string; required_qty: string;
+}
 interface AvailableMaterial {
-  id: string;
-  material_name: string;
-  unit_name: string;
-  order_id: string;
-  order_number: string;
-  available_qty: number;
+  order_item_id: string; material_name: string; unit_short: string;
+  order_id: string; order_number: string; available_qty: number;
 }
+interface SelectedOrder { order_item_id: string; required_qty: string }
+interface Props { onClose: () => void; onCreated: () => void }
 
-interface SelectedMaterial {
-  id: string;
-  material_name: string;
-  unit_name: string;
-  order_id: string;
-  order_number: string;
-  available_qty: number;
-  required_qty: string;
-  checked: boolean;
-}
+let rowCounter = 0;
 
-interface Props {
-  onClose: () => void;
-  onCreated: () => void;
+function emptyRow(): RequiredMaterialRow {
+  return { key: ++rowCounter, material_name: "", material_id: null, unit_id: "", unit_name: "", required_qty: "" };
 }
 
 export default function CreateWorkModal({ onClose, onCreated }: Props) {
@@ -36,21 +31,37 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
   const { buildings, floors, workTypes, constructions } = useDictionaries();
   const { buildingWorkTypes, workTypeConstructions, buildingWorkTypeFloors } = useDictLinks();
 
-  // Location
+  const [step, setStep] = useState(1);
+
+  // Step 1: Location
   const [selBuilding, setSelBuilding] = useState("");
   const [selWorkType, setSelWorkType] = useState("");
   const [selFloor, setSelFloor] = useState("");
   const [selConstruction, setSelConstruction] = useState("");
-
-  // Date & notes
   const [plannedDate, setPlannedDate] = useState("");
+
+  // Step 2: Required materials
+  const [items, setItems] = useState<RequiredMaterialRow[]>([emptyRow()]);
+
+  // Nomenclature autocomplete
+  const [nSearches, setNSearches] = useState<Record<number, string>>({});
+  const [nResults, setNResults] = useState<Record<number, NomenclatureItem[]>>({});
+  const [nOpen, setNOpen] = useState<number | null>(null);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Units
+  const [units, setUnits] = useState<UnitItem[]>([]);
+
+  // Step 3: Available orders per material
+  const [availableMaterials, setAvailableMaterials] = useState<AvailableMaterial[]>([]);
+  const [selectedOrders, setSelectedOrders] = useState<Record<string, SelectedOrder>>({});
+  const [loadingAvailable, setLoadingAvailable] = useState(false);
+
+  // Step 3b: Nested CreateOrderModal
+  const [showOrderModal, setShowOrderModal] = useState(false);
+
+  // Step 4: Notes & submit
   const [notes, setNotes] = useState("");
-
-  // Materials
-  const [materials, setMaterials] = useState<SelectedMaterial[]>([]);
-  const [loadingMaterials, setLoadingMaterials] = useState(false);
-
-  // State
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -63,81 +74,138 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
   const showConstructions = !isChildLocked(workTypeConstructions, selWorkType || null);
   const workTypeDisabled = !selBuilding || isChildLocked(buildingWorkTypes, selBuilding || null);
 
-  // Fetch available materials when location changes
-  const fetchMaterials = useCallback(async () => {
-    if (!project || !selBuilding || !selWorkType) {
-      setMaterials([]);
-      return;
-    }
-    setLoadingMaterials(true);
-    const params: Record<string, string> = {
-      project_id: project.id,
-      building_id: selBuilding,
-      work_type_id: selWorkType,
-    };
-    if (selFloor) params.floor_id = selFloor;
-    if (selConstruction) params.construction_id = selConstruction;
-
-    const res = await api.get<AvailableMaterial[]>("/api/installation/available-materials", params);
-    if (res.data) {
-      setMaterials(res.data.map((m: Record<string, unknown>) => ({
-        id: (m.order_item_id || m.id || "") as string,
-        material_name: (m.material_name || "") as string,
-        unit_name: (m.unit_short || m.unit_name || "") as string,
-        order_id: (m.order_id || "") as string,
-        order_number: String(m.order_number || ""),
-        available_qty: Number(m.available_qty || 0),
-        required_qty: "",
-        checked: false,
-      })));
-    }
-    setLoadingMaterials(false);
-  }, [project, selBuilding, selWorkType, selFloor, selConstruction]);
-
+  // Load units
   useEffect(() => {
-    fetchMaterials();
-  }, [fetchMaterials]);
-
-  const toggleMaterial = (id: string) => {
-    setMaterials((prev) =>
-      prev.map((m) => m.id === id ? { ...m, checked: !m.checked } : m)
-    );
-  };
-
-  const updateRequiredQty = (id: string, val: string) => {
-    setMaterials((prev) =>
-      prev.map((m) => m.id === id ? { ...m, required_qty: val } : m)
-    );
-  };
-
-  const handleSubmit = async () => {
     if (!project) return;
-    if (!selBuilding || !selWorkType) {
-      setError("Выберите место и вид работ");
+    api.get<UnitItem[]>("/api/materials/units", { project_id: project.id }).then((r) => {
+      if (r.data) setUnits(r.data);
+    });
+  }, [project]);
+
+  // Nomenclature search with debounce
+  const searchNomenclature = useCallback((key: number, q: string) => {
+    setNSearches((prev) => ({ ...prev, [key]: q }));
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    if (!q || q.length < 2 || !project) {
+      setNResults((prev) => ({ ...prev, [key]: [] }));
       return;
     }
+    searchTimerRef.current = setTimeout(async () => {
+      const r = await api.get<NomenclatureItem[]>("/api/materials/nomenclature", {
+        project_id: project.id,
+        q,
+      });
+      if (r.data) setNResults((prev) => ({ ...prev, [key]: r.data! }));
+    }, 300);
+  }, [project]);
+
+  const updateItem = (key: number, field: keyof RequiredMaterialRow, value: string) => {
+    setItems((prev) => prev.map((it) => (it.key === key ? { ...it, [field]: value } : it)));
+  };
+
+  const selectNomenclature = (key: number, item: NomenclatureItem) => {
+    setItems((prev) =>
+      prev.map((it) =>
+        it.key === key ? { ...it, material_name: item.name, material_id: item.id } : it
+      )
+    );
+    setNOpen(null);
+    setNResults((prev) => ({ ...prev, [key]: [] }));
+  };
+
+  const removeItem = (key: number) => {
+    setItems((prev) => {
+      const next = prev.filter((it) => it.key !== key);
+      return next.length === 0 ? [emptyRow()] : next;
+    });
+  };
+
+  const addItem = () => setItems((prev) => [...prev, emptyRow()]);
+
+  // Fetch available materials for step 3
+  const fetchAvailableMaterials = useCallback(async () => {
+    if (!project) return;
+    setLoadingAvailable(true);
+    const r = await api.get<AvailableMaterial[]>("/api/installation/available-materials", {
+      project_id: project.id,
+    });
+    if (r.data) setAvailableMaterials(r.data);
+    setLoadingAvailable(false);
+  }, [project]);
+
+  // Get valid material rows
+  const validItems = items.filter((it) => it.material_name && it.required_qty && Number(it.required_qty) > 0);
+
+  // Group available orders by material name (case-insensitive match)
+  const getOrdersForMaterial = (materialName: string): AvailableMaterial[] => {
+    const lower = materialName.toLowerCase();
+    return availableMaterials.filter((am) => am.material_name.toLowerCase() === lower);
+  };
+
+  const toggleOrderSelection = (orderItemId: string, availableQty: number) => {
+    setSelectedOrders((prev) => {
+      if (prev[orderItemId]) {
+        const next = { ...prev };
+        delete next[orderItemId];
+        return next;
+      }
+      return { ...prev, [orderItemId]: { order_item_id: orderItemId, required_qty: String(availableQty) } };
+    });
+  };
+
+  const updateOrderQty = (orderItemId: string, qty: string) => {
+    setSelectedOrders((prev) => ({
+      ...prev,
+      [orderItemId]: { ...prev[orderItemId], required_qty: qty },
+    }));
+  };
+
+  // Step navigation
+  const goToStep2 = () => {
+    setError(null);
     if (!plannedDate) {
       setError("Укажите плановую дату");
       return;
     }
+    setStep(2);
+  };
 
-    const selectedMaterials = materials.filter((m) => m.checked && Number(m.required_qty) > 0);
+  const goToStep3 = () => {
+    setError(null);
+    if (validItems.length === 0) {
+      setError("Добавьте хотя бы один материал с количеством");
+      return;
+    }
+    fetchAvailableMaterials();
+    setStep(3);
+  };
 
+  const goToStep4 = () => {
+    setError(null);
+    setStep(4);
+  };
+
+  const handleSubmit = async () => {
+    if (!project) return;
     setLoading(true);
     setError(null);
 
+    const materials = Object.values(selectedOrders)
+      .filter((so) => Number(so.required_qty) > 0)
+      .map((so) => ({
+        order_item_id: so.order_item_id,
+        required_qty: Number(so.required_qty),
+      }));
+
     const body = {
       project_id: project.id,
-      building_id: selBuilding,
-      work_type_id: selWorkType,
+      building_id: selBuilding || null,
+      work_type_id: selWorkType || null,
       floor_id: selFloor || null,
       construction_id: selConstruction || null,
       planned_date: plannedDate,
       notes: notes || null,
-      materials: selectedMaterials.map((m) => ({
-        order_item_id: m.id,
-        required_qty: Number(m.required_qty),
-      })),
+      materials,
     };
 
     const res = await api.post("/api/installation/works", body);
@@ -151,195 +219,368 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
     onCreated();
   };
 
+  const handleOrderCreated = () => {
+    setShowOrderModal(false);
+    fetchAvailableMaterials();
+  };
+
+  const stepTitle = ["", "Шаг 1: Место и дата", "Шаг 2: Необходимые материалы", "Шаг 3: Выбор заявок", "Шаг 4: Создание работы"][step];
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.5)" }}>
-      <div
-        className="w-full rounded-xl shadow-xl overflow-hidden flex flex-col"
-        style={{
-          maxWidth: isMobile ? "100%" : "680px",
-          maxHeight: "90vh",
-          background: "var(--ds-surface)",
-        }}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "var(--ds-border)" }}>
-          <h3 className="font-semibold text-base" style={{ color: "var(--ds-text)" }}>
-            Новые работы по монтажу
-          </h3>
-          <button className="ds-icon-btn" onClick={onClose}>
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-          {error && (
-            <div className="text-sm px-3 py-2 rounded-lg" style={{ background: "color-mix(in srgb, #ef4444 10%, var(--ds-surface))", color: "#ef4444" }}>
-              {error}
+    <>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.5)" }}>
+        <div
+          className="w-full rounded-xl shadow-xl overflow-hidden flex flex-col"
+          style={{
+            maxWidth: isMobile ? "100%" : "720px",
+            maxHeight: "90vh",
+            background: "var(--ds-surface)",
+          }}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "var(--ds-border)" }}>
+            <div>
+              <h3 className="font-semibold text-base" style={{ color: "var(--ds-text)" }}>
+                Новые работы по монтажу
+              </h3>
+              <p className="text-xs mt-0.5" style={{ color: "var(--ds-text-faint)" }}>{stepTitle}</p>
             </div>
-          )}
-
-          {/* Location selectors */}
-          <div className="space-y-3">
-            <label className="block text-xs font-medium" style={{ color: "var(--ds-text-muted)" }}>
-              Место
-            </label>
-            <div className={`grid gap-3 ${isMobile ? "grid-cols-1" : "grid-cols-2"}`}>
-              <select
-                className="ds-input text-sm"
-                value={selBuilding}
-                onChange={(e) => {
-                  setSelBuilding(e.target.value);
-                  setSelWorkType("");
-                  setSelFloor("");
-                  setSelConstruction("");
-                }}
-              >
-                <option value="">Место работ...</option>
-                {buildings.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </select>
-
-              <select
-                className="ds-input text-sm"
-                value={selWorkType}
-                onChange={(e) => {
-                  setSelWorkType(e.target.value);
-                  setSelFloor("");
-                  setSelConstruction("");
-                }}
-                disabled={workTypeDisabled}
-              >
-                <option value="">Вид работ...</option>
-                {filteredWorkTypes.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-              </select>
-
-              {showFloors && (
-                <select
-                  className="ds-input text-sm"
-                  value={selFloor}
-                  onChange={(e) => setSelFloor(e.target.value)}
-                >
-                  <option value="">Уровень...</option>
-                  {filteredFloors.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-                </select>
-              )}
-
-              {showConstructions && (
-                <select
-                  className="ds-input text-sm"
-                  value={selConstruction}
-                  onChange={(e) => setSelConstruction(e.target.value)}
-                >
-                  <option value="">Конструкция...</option>
-                  {filteredConstructions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              )}
-            </div>
+            <button className="ds-icon-btn" onClick={onClose}>
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
 
-          {/* Planned date */}
-          <div>
-            <label className="block text-xs font-medium mb-2" style={{ color: "var(--ds-text-muted)" }}>
-              Плановая дата <span style={{ color: "#ef4444" }}>*</span>
-            </label>
-            <input
-              type="date"
-              className="ds-input text-sm"
-              value={plannedDate}
-              onChange={(e) => setPlannedDate(e.target.value)}
-            />
-          </div>
+          {/* Body */}
+          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+            {error && (
+              <div className="text-sm px-3 py-2 rounded-lg" style={{ background: "color-mix(in srgb, #ef4444 10%, var(--ds-surface))", color: "#ef4444" }}>
+                {error}
+              </div>
+            )}
 
-          {/* Available materials */}
-          <div>
-            <label className="block text-xs font-medium mb-2" style={{ color: "var(--ds-text-muted)" }}>
-              Доступные материалы
-            </label>
-            {loadingMaterials ? (
-              <div className="py-4 text-center">
-                <div
-                  className="inline-block w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin"
-                  style={{ color: "var(--ds-accent)" }}
-                />
-              </div>
-            ) : materials.length === 0 ? (
-              <div className="py-4 text-center text-sm rounded-lg" style={{ background: "var(--ds-surface-sunken)", color: "var(--ds-text-faint)" }}>
-                {selBuilding && selWorkType
-                  ? "Нет доступных материалов для выбранного места"
-                  : "Выберите место и вид работ для загрузки материалов"}
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {materials.map((mat) => (
-                  <div
-                    key={mat.id}
-                    className="flex items-center gap-3 p-3 rounded-lg"
-                    style={{ background: "var(--ds-surface-sunken)" }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={mat.checked}
-                      onChange={() => toggleMaterial(mat.id)}
-                      className="w-4 h-4 flex-shrink-0"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate" style={{ color: "var(--ds-text)" }}>
-                        {mat.material_name}
-                      </p>
-                      <p className="text-xs" style={{ color: "var(--ds-text-faint)" }}>
-                        Заявка #{mat.order_number} -- доступно: {mat.available_qty} {mat.unit_name}
-                      </p>
-                    </div>
-                    {mat.checked && (
-                      <input
-                        type="number"
+            {/* ===== STEP 1: Location ===== */}
+            {step === 1 && (
+              <>
+                <div className="space-y-3">
+                  <label className="block text-xs font-medium" style={{ color: "var(--ds-text-muted)" }}>Место</label>
+                  <div className={`grid gap-3 ${isMobile ? "grid-cols-1" : "grid-cols-2"}`}>
+                    <select
+                      className="ds-input text-sm"
+                      value={selBuilding}
+                      onChange={(e) => { setSelBuilding(e.target.value); setSelWorkType(""); setSelFloor(""); setSelConstruction(""); }}
+                    >
+                      <option value="">Место работ...</option>
+                      {buildings.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    </select>
+
+                    <select
+                      className="ds-input text-sm"
+                      value={selWorkType}
+                      onChange={(e) => { setSelWorkType(e.target.value); setSelFloor(""); setSelConstruction(""); }}
+                      disabled={workTypeDisabled}
+                    >
+                      <option value="">Вид работ...</option>
+                      {filteredWorkTypes.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                    </select>
+
+                    {showFloors && (
+                      <select
                         className="ds-input text-sm"
-                        style={{ width: "90px" }}
-                        min="0"
-                        max={mat.available_qty}
-                        step="0.01"
-                        placeholder="Кол-во"
-                        value={mat.required_qty}
-                        onChange={(e) => updateRequiredQty(mat.id, e.target.value)}
+                        value={selFloor}
+                        onChange={(e) => setSelFloor(e.target.value)}
+                      >
+                        <option value="">Уровень...</option>
+                        {filteredFloors.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                      </select>
+                    )}
+
+                    {showConstructions && (
+                      <select
+                        className="ds-input text-sm"
+                        value={selConstruction}
+                        onChange={(e) => setSelConstruction(e.target.value)}
+                      >
+                        <option value="">Конструкция...</option>
+                        {filteredConstructions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium mb-2" style={{ color: "var(--ds-text-muted)" }}>
+                    Плановая дата <span style={{ color: "#ef4444" }}>*</span>
+                  </label>
+                  <input
+                    type="date"
+                    className="ds-input text-sm"
+                    value={plannedDate}
+                    onChange={(e) => setPlannedDate(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
+
+            {/* ===== STEP 2: Required materials ===== */}
+            {step === 2 && (
+              <div className="space-y-3">
+                <label className="block text-xs font-medium" style={{ color: "var(--ds-text-muted)" }}>
+                  Укажите необходимые материалы
+                </label>
+                {items.map((item) => (
+                  <div key={item.key} className="flex gap-2 items-start">
+                    {/* Material name with autocomplete */}
+                    <div className="flex-1 relative">
+                      <input
+                        className="ds-input text-sm w-full"
+                        placeholder="Наименование материала"
+                        value={nSearches[item.key] ?? item.material_name}
+                        onChange={(e) => {
+                          updateItem(item.key, "material_name", e.target.value);
+                          updateItem(item.key, "material_id", "");
+                          searchNomenclature(item.key, e.target.value);
+                          setNOpen(item.key);
+                        }}
+                        onFocus={() => setNOpen(item.key)}
+                        onBlur={() => setTimeout(() => setNOpen(null), 200)}
                       />
+                      {nOpen === item.key && (nResults[item.key] || []).length > 0 && (
+                        <div
+                          className="absolute z-10 left-0 right-0 mt-1 rounded-lg shadow-lg border max-h-40 overflow-y-auto"
+                          style={{ background: "var(--ds-surface)", borderColor: "var(--ds-border)" }}
+                        >
+                          {nResults[item.key].map((n) => (
+                            <button
+                              key={n.id}
+                              className="block w-full text-left text-sm px-3 py-2 hover:opacity-80 transition-opacity"
+                              style={{ color: "var(--ds-text)" }}
+                              onMouseDown={() => selectNomenclature(item.key, n)}
+                            >
+                              {n.name}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Unit */}
+                    <select
+                      className="ds-input text-sm"
+                      style={{ width: isMobile ? "80px" : "120px" }}
+                      value={item.unit_id}
+                      onChange={(e) => {
+                        updateItem(item.key, "unit_id", e.target.value);
+                        const u = units.find((u) => u.id === e.target.value);
+                        if (u) updateItem(item.key, "unit_name", u.name);
+                      }}
+                    >
+                      <option value="">Ед.</option>
+                      {units.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                    </select>
+
+                    {/* Required quantity */}
+                    <input
+                      className="ds-input text-sm"
+                      style={{ width: isMobile ? "70px" : "100px" }}
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="Кол-во"
+                      value={item.required_qty}
+                      onChange={(e) => updateItem(item.key, "required_qty", e.target.value)}
+                    />
+
+                    {/* Remove */}
+                    {items.length > 1 && (
+                      <button
+                        className="ds-icon-btn flex-shrink-0 mt-1"
+                        onClick={() => removeItem(item.key)}
+                        title="Удалить"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
                     )}
                   </div>
                 ))}
+                <button className="ds-btn-secondary text-xs px-3 py-1.5" onClick={addItem}>
+                  + Добавить материал
+                </button>
+              </div>
+            )}
+
+            {/* ===== STEP 3: Select orders ===== */}
+            {step === 3 && (
+              <div className="space-y-4">
+                <label className="block text-xs font-medium" style={{ color: "var(--ds-text-muted)" }}>
+                  Выберите заявки для каждого материала
+                </label>
+
+                {loadingAvailable ? (
+                  <div className="py-6 text-center">
+                    <div
+                      className="inline-block w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin"
+                      style={{ color: "var(--ds-accent)" }}
+                    />
+                  </div>
+                ) : (
+                  validItems.map((item) => {
+                    const orders = getOrdersForMaterial(item.material_name);
+                    const totalSelected = orders
+                      .filter((o) => selectedOrders[o.order_item_id])
+                      .reduce((sum, o) => sum + Number(selectedOrders[o.order_item_id]?.required_qty || 0), 0);
+                    const needed = Number(item.required_qty);
+                    const shortage = needed - totalSelected;
+
+                    return (
+                      <div
+                        key={item.key}
+                        className="rounded-lg p-3"
+                        style={{ background: "var(--ds-surface-sunken)" }}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-sm font-medium" style={{ color: "var(--ds-text)" }}>
+                            {item.material_name}
+                          </p>
+                          <span className="text-xs" style={{ color: "var(--ds-text-faint)" }}>
+                            Нужно: {needed} {item.unit_name}
+                            {totalSelected > 0 && (
+                              <> | Выбрано: {totalSelected}</>
+                            )}
+                          </span>
+                        </div>
+
+                        {orders.length === 0 ? (
+                          <p className="text-xs py-2" style={{ color: "var(--ds-text-faint)" }}>
+                            Нет доступных заявок с этим материалом
+                          </p>
+                        ) : (
+                          <div className="space-y-1.5">
+                            {orders.map((order) => {
+                              const isChecked = !!selectedOrders[order.order_item_id];
+                              return (
+                                <div key={order.order_item_id} className="flex items-center gap-3">
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={() => toggleOrderSelection(order.order_item_id, Math.min(order.available_qty, needed))}
+                                    className="w-4 h-4 flex-shrink-0"
+                                  />
+                                  <span className="text-sm flex-1" style={{ color: "var(--ds-text)" }}>
+                                    Заявка №{order.order_number}
+                                    <span className="text-xs ml-2" style={{ color: "var(--ds-text-faint)" }}>
+                                      (доступно: {order.available_qty} {order.unit_short})
+                                    </span>
+                                  </span>
+                                  {isChecked && (
+                                    <input
+                                      type="number"
+                                      className="ds-input text-sm"
+                                      style={{ width: "90px" }}
+                                      min="0"
+                                      max={order.available_qty}
+                                      step="0.01"
+                                      placeholder="Кол-во"
+                                      value={selectedOrders[order.order_item_id]?.required_qty || ""}
+                                      onChange={(e) => updateOrderQty(order.order_item_id, e.target.value)}
+                                    />
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Shortage warning + order button */}
+                        {shortage > 0 && (
+                          <div className="flex items-center justify-between mt-2 pt-2 border-t" style={{ borderColor: "var(--ds-border)" }}>
+                            <span className="text-xs" style={{ color: "#f59e0b" }}>
+                              Не хватает: {shortage.toFixed(2)} {item.unit_name}
+                            </span>
+                            <button
+                              className="ds-btn-secondary text-xs px-3 py-1"
+                              onClick={() => setShowOrderModal(true)}
+                            >
+                              Заказать
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+
+            {/* ===== STEP 4: Notes + Submit ===== */}
+            {step === 4 && (
+              <div>
+                <label className="block text-xs font-medium mb-2" style={{ color: "var(--ds-text-muted)" }}>
+                  Примечание
+                </label>
+                <textarea
+                  className="ds-input text-sm w-full"
+                  rows={3}
+                  placeholder="Комментарий к работам..."
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                />
               </div>
             )}
           </div>
 
-          {/* Notes */}
-          <div>
-            <label className="block text-xs font-medium mb-2" style={{ color: "var(--ds-text-muted)" }}>
-              Примечание
-            </label>
-            <textarea
-              className="ds-input text-sm w-full"
-              rows={3}
-              placeholder="Комментарий к работам..."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
+          {/* Footer */}
+          <div className="flex items-center justify-between px-5 py-4 border-t" style={{ borderColor: "var(--ds-border)" }}>
+            <div>
+              {step > 1 && (
+                <button
+                  className="ds-btn-secondary text-sm px-4 py-2"
+                  onClick={() => { setError(null); setStep(step - 1); }}
+                  disabled={loading}
+                >
+                  Назад
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button className="ds-btn-secondary text-sm px-4 py-2" onClick={onClose} disabled={loading}>
+                Отмена
+              </button>
+              {step === 1 && (
+                <button className="ds-btn text-sm px-4 py-2" onClick={goToStep2}>
+                  Далее
+                </button>
+              )}
+              {step === 2 && (
+                <button className="ds-btn text-sm px-4 py-2" onClick={goToStep3}>
+                  Далее
+                </button>
+              )}
+              {step === 3 && (
+                <button className="ds-btn text-sm px-4 py-2" onClick={goToStep4}>
+                  Далее
+                </button>
+              )}
+              {step === 4 && (
+                <button className="ds-btn text-sm px-4 py-2" onClick={handleSubmit} disabled={loading}>
+                  {loading ? "Создание..." : "Создать работу"}
+                </button>
+              )}
+            </div>
           </div>
         </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t" style={{ borderColor: "var(--ds-border)" }}>
-          <button className="ds-btn-secondary text-sm px-4 py-2" onClick={onClose} disabled={loading}>
-            Отмена
-          </button>
-          <button
-            className="ds-btn text-sm px-4 py-2"
-            onClick={handleSubmit}
-            disabled={loading}
-          >
-            {loading ? "Создание..." : "Создать"}
-          </button>
-        </div>
       </div>
-    </div>
+
+      {/* Nested CreateOrderModal */}
+      {showOrderModal && (
+        <CreateOrderModal
+          onClose={() => setShowOrderModal(false)}
+          onCreated={handleOrderCreated}
+        />
+      )}
+    </>
   );
 }
