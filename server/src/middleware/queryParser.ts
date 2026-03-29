@@ -86,7 +86,10 @@ const REVERSE_FK: Record<string, Record<string, string>> = {
     file_share_recipients: 'share_id', file_share_files: 'share_id',
     file_share_overlay_masks: 'share_id',
   },
+  cell_comments: { cell_comment_files: 'comment_id' },
   gro_cells: { gro_cell_files: 'gro_cell_id' },
+  gro_cell_files: { gro_cell_file_versions: 'file_id' },
+  cell_files: { cell_file_versions: 'file_id' },
   project_statuses: { status_role_assignments: 'status_id' },
 };
 
@@ -329,8 +332,6 @@ export function buildSelectSQL(table: string, req: Request): BuiltQuery {
     }
   }
 
-  let sql = `SELECT ${selectParts.join(', ')} FROM "${table}" t`;
-
   // --- Collect dot-notation filters for joined tables ---
   // e.g. cells.cell_type=eq.registry → joinFilters["cells"] = [{ col: "cell_type", op: "eq", val: "registry" }]
   const joinFilters: Record<string, { col: string; rawValue: string }[]> = {};
@@ -406,6 +407,9 @@ export function buildSelectSQL(table: string, req: Request): BuiltQuery {
       }
     }
   }
+
+  // --- Build SQL ---
+  let sql = `SELECT ${selectParts.join(', ')} FROM "${table}" t`;
 
   // --- WHERE ---
   const whereParts: string[] = [];
