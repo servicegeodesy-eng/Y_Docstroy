@@ -47,7 +47,7 @@ export default function WorkProcessModal({ work, onClose, onUpdated }: Props) {
 
   // Material usage
   const [usages, setUsages] = useState<MaterialUsage[]>(() =>
-    work.materials.map((m) => ({
+    ((work.materials || []) || []).map((m) => ({
       material_id: m.id,
       material_name: m.material_name,
       unit_name: m.unit_name,
@@ -137,7 +137,7 @@ export default function WorkProcessModal({ work, onClose, onUpdated }: Props) {
 
   const prepareComplete = () => {
     // Calculate unused quantities for disposition
-    const disps: Disposition[] = work.materials
+    const disps: Disposition[] = (work.materials || [])
       .map((m) => {
         const usage = usages.find((u) => u.material_id === m.id);
         const usedQty = usage ? Number(usage.used_qty) || 0 : m.used_qty;
@@ -228,7 +228,7 @@ export default function WorkProcessModal({ work, onClose, onUpdated }: Props) {
       <ModalShell title={`Работа #${work.work_number}`} onClose={onClose} isMobile={isMobile}>
         <div className="px-5 py-4 space-y-4">
           <WorkInfo work={work} />
-          <MaterialsSummary materials={work.materials} />
+          <MaterialsSummary materials={(work.materials || [])} />
           <div className="flex justify-end pt-2">
             <button className="ds-btn-secondary text-sm px-4 py-2" onClick={onClose}>
               Закрыть
