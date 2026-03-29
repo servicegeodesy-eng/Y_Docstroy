@@ -232,21 +232,21 @@ export default function ConstructionMapPage() {
             <rect key={`cl-${i}`} x={cx - 5} y={FY} width="10" height={FH} fill={p("pat-concrete", "pat-concrete-dk")} stroke={dk ? "#5a7a90" : "#7a8a9a"} strokeWidth="0.8" />
           ))}
           <FramedLabel x={lcX} y={aboveY.frame} text="Каркас" dk={dk} id="frame" hovered={hovered}
-            lineFromX={FX + FW * 0.4} lineFromY={FY + FH * 0.7} />
+            lineFromX={FX + 10} lineFromY={FY + FH * 0.8} />
         </g>
 
         {/* FLOORS — strips above and below floor slabs in frame */}
         <g {...zoneProps("floors")}>
           {frameRows.map((sy, i) => (
             <g key={`floor-${i}`}>
-              {/* Strip above slab */}
-              <rect x={FX + 2} y={sy - 9} width={FW - 4} height="5" fill={dk ? "#4a6070" : "#b8c8d8"} opacity="0.6" rx="1" />
+              {/* Strip above slab — skip on top slab (i=0) */}
+              {i > 0 && <rect x={FX + 2} y={sy - 9} width={FW - 4} height="5" fill={dk ? "#4a6070" : "#b8c8d8"} opacity="0.6" rx="1" />}
               {/* Strip below slab */}
               <rect x={FX + 2} y={sy + 4} width={FW - 4} height="5" fill={dk ? "#4a5a68" : "#c8d4e0"} opacity="0.5" rx="1" />
             </g>
           ))}
           <FramedLabel x={lcX} y={aboveY.floors} text="Полы и потолки" dk={dk} id="floors" hovered={hovered}
-            lineFromX={FX + FW * 0.3} lineFromY={frameRows[2] - 7} />
+            lineFromX={FX + FW * 0.5} lineFromY={frameRows[1] + 5} />
         </g>
 
         {/* WALLS — brick infill in frame */}
@@ -260,7 +260,7 @@ export default function ConstructionMapPage() {
             );
           }))}
           <FramedLabel x={lcX} y={aboveY.walls} text="Стены" dk={dk} id="walls" hovered={hovered}
-            lineFromX={FX + FW * 0.4} lineFromY={FY + FH * 0.35} />
+            lineFromX={FX + FW * 0.6} lineFromY={FY + FH * 0.45} />
         </g>
 
         {/* FACADE — RIGHT side of building */}
@@ -277,7 +277,7 @@ export default function ConstructionMapPage() {
           <rect x={BX+78} y={BY+BH-48} width="54" height="48" rx="3" fill={dk ? "#2a3848" : "#5a4a3a"} stroke={dk ? "#4a6070" : "#4a3a2a"} strokeWidth="1.5" />
           <circle cx={BX+122} cy={BY+BH-22} r="3" fill={dk ? "#8ab0d0" : "#c8a868"} />
           <FramedLabel x={lcX} y={aboveY.facade} text="Фасад" dk={dk} id="facade" hovered={hovered}
-            lineFromX={BX + 40} lineFromY={BY + 20} />
+            lineFromX={BX + BW / 2} lineFromY={BY + 10} />
         </g>
 
         {/* ROOF */}
@@ -290,7 +290,7 @@ export default function ConstructionMapPage() {
             return <line key={`rt-${t}`} x1={RoofLeft+(mid-RoofLeft)*(1-t)+10} y1={ly} x2={RoofRight-(RoofRight-mid)*(1-t)-10} y2={ly} stroke={dk ? "#4a6888" : "#4a6888"} strokeWidth="0.6" opacity="0.4" />;
           })}
           <FramedLabel x={lcX} y={aboveY.roof} text="Кровля" dk={dk} id="roof" hovered={hovered}
-            lineFromX={(RoofLeft + RoofRight) / 2 + 80} lineFromY={RoofPeak + 12} />
+            lineFromX={(RoofLeft + RoofRight) / 2 + 40} lineFromY={RoofPeak + 4} />
         </g>
 
         {/* EARTHWORK — RIGHT side */}
@@ -333,7 +333,7 @@ export default function ConstructionMapPage() {
             </g>);
           })}
           <FramedLabel x={lcX} y={belowY.piles} text="Сваи" dk={dk} id="piles" hovered={hovered}
-            lineFromX={ShoringLeft + SheetW + 40} lineFromY={PitTop + PileLen * 0.7} />
+            lineFromX={ShoringLeft + SheetW + 60} lineFromY={PitTop + PileLen * 0.6} />
         </g>
       </svg>
     </div>
