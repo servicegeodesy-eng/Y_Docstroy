@@ -52,10 +52,32 @@ export default function MaterialsPage() {
   const loadRemaining = useCallback(async () => {
     if (!project) return;
     setLoading(true);
-    const res = await api.get<RemainingGroup[]>("/api/materials/remaining", {
+    interface RawRow { building_name: string; work_type_name: string; floor_name: string | null; construction_name: string | null; material_name: string; unit_short: string; remaining: number }
+    const res = await api.get<RawRow[]>("/api/materials/remaining", {
       project_id: project.id,
     });
-    if (res.data) setRemaining(res.data);
+    if (res.data) {
+      // Группировка по локации
+      const map = new Map<string, RemainingGroup>();
+      for (const row of res.data) {
+        const key = [row.building_name, row.work_type_name, row.floor_name, row.construction_name].join("|");
+        if (!map.has(key)) {
+          map.set(key, {
+            building_name: row.building_name,
+            work_type_name: row.work_type_name,
+            floor_name: row.floor_name,
+            construction_name: row.construction_name,
+            items: [],
+          });
+        }
+        map.get(key)!.items.push({
+          material_name: row.material_name,
+          unit_name: row.unit_short || "",
+          remaining: Number(row.remaining) || 0,
+        });
+      }
+      setRemaining(Array.from(map.values()));
+    }
     setLoading(false);
   }, [project]);
 
