@@ -7,6 +7,8 @@ import { useMobile } from "@/lib/MobileContext";
 import { useOverlays } from "@/hooks/useOverlays";
 import { getOverlayUrl } from "@/lib/overlayUrlCache";
 import CreateOrderModal from "@/components/materials/CreateOrderModal";
+import PolygonDrawer from "@/components/plan/PolygonDrawer";
+import type { Point } from "@/components/plan/SnapEngine";
 
 interface NomenclatureItem { id: string; name: string; unit_id?: string }
 interface UnitItem { id: string; short_name: string; name: string }
@@ -41,10 +43,10 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
   const [plannedDate, setPlannedDate] = useState("");
 
   // Overlay & mask
-  const [overlayId, setOverlayId] = useState("");
+  const [linkedOverlay, setLinkedOverlay] = useState<{ id: string; name: string; width: number; height: number; storage_path: string } | null>(null);
   const [overlayUrl, setOverlayUrl] = useState("");
-  const [maskDrawn, setMaskDrawn] = useState(false);
-  const [polygonPoints, setPolygonPoints] = useState<{ x: number; y: number }[]>([]);
+  const [showOverlayEditor, setShowOverlayEditor] = useState(false);
+  const [drawnPolygons, setDrawnPolygons] = useState<Point[][]>([]);
 
   // Materials
   const [items, setItems] = useState<MaterialRow[]>([emptyRow()]);
@@ -80,14 +82,12 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
     });
   }, [project]);
 
-  // Load overlay when location changes — filter by workType and building links
+  // Load overlay when location changes
   useEffect(() => {
-    if (!selWorkType) { setOverlayId(""); setOverlayUrl(""); return; }
-    // Get overlay IDs linked to selected work type
-    const linkedOverlayIds = workTypeOverlays[selWorkType] || [];
-    // Find first overlay that matches (optionally filter by building too)
+    if (!selWorkType) { setLinkedOverlay(null); setOverlayUrl(""); setDrawnPolygons([]); return; }
+    const linkedIds = workTypeOverlays[selWorkType] || [];
     const match = overlays.find((o) => {
-      if (!linkedOverlayIds.includes(o.id)) return false;
+      if (!linkedIds.includes(o.id)) return false;
       if (selBuilding) {
         const bldIds = overlayBuildings[o.id] || [];
         if (bldIds.length > 0 && !bldIds.includes(selBuilding)) return false;
@@ -95,12 +95,13 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
       return true;
     });
     if (match) {
-      setOverlayId(match.id);
+      setLinkedOverlay({ id: match.id, name: match.name, width: match.width || 1000, height: match.height || 750, storage_path: match.storage_path });
       getOverlayUrl(match.storage_path).then(setOverlayUrl);
     } else {
-      setOverlayId("");
+      setLinkedOverlay(null);
       setOverlayUrl("");
     }
+    setDrawnPolygons([]);
   }, [selBuilding, selWorkType, overlays, workTypeOverlays, overlayBuildings]);
 
   // Load available orders when items change
@@ -167,8 +168,11 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
 
   const allBalanced = validItems.length > 0 && validItems.every(it => getMaterialBalance(it).balanced);
 
+  const canSubmit = allBalanced && drawnPolygons.length > 0 && linkedOverlay;
+
   const handleSubmit = async () => {
     if (!project) return;
+    if (drawnPolygons.length === 0) { setError("Необходимо отметить область на подложке"); return; }
     if (validItems.length === 0) { setError("Добавьте материалы"); return; }
     if (!allBalanced) { setError("Количество выбранных материалов должно совпадать с необходимым"); return; }
 
@@ -192,12 +196,14 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
 
     if (res.error) { setError(res.error); setLoading(false); return; }
 
-    // Save mask if drawn
-    if (polygonPoints.length >= 3 && overlayId && res.data) {
+    // Save masks
+    if (drawnPolygons.length > 0 && linkedOverlay && res.data) {
       const workId = (res.data as { id: string }).id;
-      await api.post("/api/installation/masks", {
-        work_id: workId, overlay_id: overlayId, polygon_points: polygonPoints,
-      });
+      for (const poly of drawnPolygons) {
+        await api.post("/api/installation/masks", {
+          work_id: workId, overlay_id: linkedOverlay.id, polygon_points: poly,
+        });
+      }
     }
 
     // Upload files
@@ -214,6 +220,46 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
     setLoading(false);
     onCreated();
   };
+
+  // Fullscreen PolygonDrawer
+  if (showOverlayEditor && linkedOverlay && overlayUrl) {
+    return (
+      <div className="fixed inset-0 z-[60] flex flex-col" style={{ background: "var(--ds-surface)" }}>
+        <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid var(--ds-border)" }}>
+          <div>
+            <h2 className="text-lg font-semibold" style={{ color: "var(--ds-text)" }}>Отметить области на подложке</h2>
+            <p className="text-xs mt-0.5" style={{ color: "var(--ds-text-muted)" }}>
+              {linkedOverlay.name}
+              {drawnPolygons.length > 0 && (
+                <span className="ml-2 font-medium" style={{ color: "var(--ds-accent)" }}>
+                  Нарисовано областей: {drawnPolygons.length}
+                </span>
+              )}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowOverlayEditor(false)} className="ds-btn px-3 py-1.5 text-sm">Готово</button>
+            <button onClick={() => setShowOverlayEditor(false)} className="ds-icon-btn">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+        </div>
+        <div className="flex-1 min-h-0 overflow-hidden p-4">
+          <PolygonDrawer
+            imageUrl={overlayUrl}
+            imageWidth={linkedOverlay.width}
+            imageHeight={linkedOverlay.height}
+            existingMasks={[]}
+            newPolygons={drawnPolygons}
+            onRemovePolygon={(index) => setDrawnPolygons(p => p.filter((_, i) => i !== index))}
+            getColorKey={() => "green"}
+            onComplete={(points) => setDrawnPolygons(p => [...p, points])}
+            onCancel={() => setShowOverlayEditor(false)}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.5)" }}>
@@ -247,16 +293,40 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
             </div>
           </Section>
 
-          {/* === Подложка === */}
-          {overlayUrl && (
-            <Section title="Область на подложке">
-              <div className="rounded-lg overflow-hidden border" style={{ borderColor: "var(--ds-border)" }}>
-                <img src={overlayUrl} alt="Подложка" className="w-full max-h-48 object-contain" style={{ background: "var(--ds-surface-sunken)" }} />
+          {/* === Подложка и область === */}
+          {linkedOverlay && overlayUrl && (
+            <div className="border rounded-lg p-3" style={{ background: "color-mix(in srgb, var(--ds-accent) 10%, var(--ds-surface))", color: "var(--ds-accent)", borderColor: "var(--ds-border)" }}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <div>
+                    <p className="text-sm font-medium">{linkedOverlay.name}</p>
+                    <p className="text-xs opacity-75 mt-0.5">
+                      {drawnPolygons.length > 0
+                        ? `Отмечено областей: ${drawnPolygons.length}`
+                        : <>Необходимо отметить области на плане <span style={{ color: "#ef4444" }}>*</span></>}
+                    </p>
+                  </div>
+                </div>
+                <button type="button" onClick={() => setShowOverlayEditor(true)} className="ds-btn px-3 py-1.5 text-xs whitespace-nowrap">
+                  {drawnPolygons.length > 0 ? "Изменить области" : "Отметить области"}
+                </button>
               </div>
-              <p className="text-xs mt-1" style={{ color: "var(--ds-text-faint)" }}>
-                Подложка загружена. Разметка области будет доступна после создания работы.
-              </p>
-            </Section>
+              {drawnPolygons.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {drawnPolygons.map((poly, i) => (
+                    <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs" style={{ background: "color-mix(in srgb, var(--ds-accent) 15%, var(--ds-surface))", color: "var(--ds-accent)" }}>
+                      Область {i + 1} ({poly.length} т.)
+                      <button type="button" onClick={() => setDrawnPolygons(p => p.filter((_, j) => j !== i))} style={{ color: "var(--ds-text-faint)" }}>
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
 
           {/* === Материалы === */}
@@ -362,7 +432,7 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
         {/* Footer */}
         <div className="flex items-center justify-end gap-3 px-6 py-4" style={{ borderTop: "1px solid var(--ds-border)" }}>
           <button onClick={onClose} className="ds-btn-secondary text-sm">Отмена</button>
-          <button onClick={handleSubmit} disabled={loading || !allBalanced} className="ds-btn text-sm">
+          <button onClick={handleSubmit} disabled={loading || !canSubmit} className="ds-btn text-sm">
             {loading ? "Создание..." : "Создать работу"}
           </button>
         </div>
