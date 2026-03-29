@@ -24,12 +24,13 @@ router.get('/works', async (req: AuthRequest, res: Response) => {
         db.name as building_name, dwt.name as work_type_name,
         df.name as floor_name, dc.name as construction_name,
         u.last_name, u.first_name,
+        get_work_progress(iw.id) as progress,
         (SELECT json_agg(json_build_object(
           'id', im.id, 'order_item_id', im.order_item_id,
           'required_qty', im.required_qty, 'used_qty', im.used_qty,
           'material_name', dm.name, 'unit_short', du.short_name,
           'order_number', mo.order_number,
-          'ordered_qty', moi.quantity, 'delivered_qty', moi.delivered_qty
+          'available_qty', moi.delivered_qty
         )) FROM installation_materials im
           JOIN material_order_items moi ON moi.id = im.order_item_id
           JOIN dict_materials dm ON dm.id = moi.material_id
