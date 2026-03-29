@@ -294,8 +294,8 @@ function MobileCards({
           >
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2 min-w-0">
-                {isUnacknowledged && (
-                  <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" />
+                {(isUnacknowledged || (isInWork && canExecute && cell.assigned_to === userId)) && (
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" title="Требует действия" />
                 )}
                 {cell.request_work_type && (
                   <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium shrink-0" style={{ background: "color-mix(in srgb, var(--ds-accent) 10%, var(--ds-surface))", color: "var(--ds-accent)" }}>

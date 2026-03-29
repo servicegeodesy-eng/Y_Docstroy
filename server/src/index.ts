@@ -29,6 +29,7 @@ import taskRoutes from './routes/tasks';
 import fileshareRoutes from './routes/fileshare';
 import notificationRoutes from './routes/notifications';
 import pushRoutes from './routes/push';
+import badgeRoutes from './routes/badges';
 import rpcRoutes from './routes/rpc';
 import companyRoutes from './routes/companies';
 import genericRoutes from './routes/generic';
@@ -64,6 +65,7 @@ app.use('/api/tasks', taskRoutes);
 app.use('/api/fileshare', fileshareRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/push', pushRoutes);
+app.use('/api/badges', badgeRoutes);
 app.use('/api/rpc', rpcRoutes);
 
 // Generic CRUD fallback (MUST be last — catches /api/query/:table)

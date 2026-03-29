@@ -53,6 +53,24 @@ router.patch('/:id/read', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// PATCH /api/notifications/read-by-cell/:cellId — пометить все уведомления по ячейке как прочитанные
+router.patch('/read-by-cell/:cellId', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const cellId = req.params.cellId;
+
+    const result = await pool.query(
+      'UPDATE notifications SET is_read = true WHERE user_id = $1 AND cell_id = $2 AND is_read = false RETURNING id',
+      [userId, cellId]
+    );
+
+    res.json({ ok: true, updated: result.rowCount });
+  } catch (err) {
+    console.error('Mark notifications read by cell error:', err);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
 // DELETE /api/notifications/read
 router.delete('/read', async (req: AuthRequest, res: Response) => {
   try {

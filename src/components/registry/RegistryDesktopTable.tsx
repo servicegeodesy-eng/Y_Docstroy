@@ -142,6 +142,9 @@ export default function RegistryDesktopTable({
                 </td>
                 <td className="px-4 py-1.5 font-medium text-sm" style={{ color: "var(--ds-text)" }}>
                   <div className="flex items-center gap-1.5">
+                    {cell.assigned_to === userId && cell.send_type && (
+                      <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" title="Требует действия" />
+                    )}
                     {cell.name}
                   </div>
                   {cell.manual_tag && (

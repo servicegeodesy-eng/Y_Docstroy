@@ -10,6 +10,7 @@ import NotificationBell from "./NotificationBell";
 import { supabase } from "@/lib/supabase";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { shortName, type ProfileShort } from "@/lib/utils";
+import { useBadgeCounts, type BadgeCounts } from "@/hooks/useBadgeCounts";
 
 function WorkspaceContent() {
   const { user } = useAuth();
@@ -24,6 +25,7 @@ function WorkspaceContent() {
 
   const geo = isGeoMode();
   const canSeeTasks = geo ? false : hasPermission("can_view_tasks");
+  const badges = useBadgeCounts();
 
   // Когда count уведомлений растёт — показываем кружок на задачах
   const handleNotifCountChange = useCallback((count: number) => {
@@ -151,7 +153,7 @@ function WorkspaceContent() {
   return (
     <div className="h-screen flex overflow-hidden print:bg-white transition-colors" style={{ background: "var(--ds-surface-sunken)" }}>
       {/* Десктоп сайдбар — скрыт в geo-режиме */}
-      {!geo && !isMobile && <Sidebar isAdmin={isProjectAdmin} />}
+      {!geo && !isMobile && <Sidebar isAdmin={isProjectAdmin} badges={badges} />}
 
       {/* Мобильное меню-оверлей — скрыт в geo-режиме */}
       {!geo && isMobile && menuOpen && (
@@ -162,7 +164,7 @@ function WorkspaceContent() {
             onClick={() => setMenuOpen(false)}
           />
           <div className="relative w-72 max-w-[85vw] h-full">
-            <Sidebar isAdmin={isProjectAdmin} mobileMode onNavigate={() => setMenuOpen(false)} />
+            <Sidebar isAdmin={isProjectAdmin} mobileMode onNavigate={() => setMenuOpen(false)} badges={badges} />
           </div>
         </div>
       )}

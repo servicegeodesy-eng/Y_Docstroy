@@ -5,11 +5,13 @@ import { useProject } from "@/lib/ProjectContext";
 import { useTheme } from "@/lib/ThemeContext";
 import { isGeoMode } from "@/lib/geoMode";
 import { usePwaInstall } from "@/lib/usePwaInstall";
+import type { BadgeCounts } from "@/hooks/useBadgeCounts";
 
 interface SidebarProps {
   isAdmin: boolean;
   mobileMode?: boolean;
   onNavigate?: () => void;
+  badges?: BadgeCounts;
 }
 
 export function DocStroyLogo({ size = 32, iconOnly = false }: { size?: number; iconOnly?: boolean }) {
@@ -140,7 +142,7 @@ const requestItem = {
   label: "Заявки",
   icon: (
     <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
     </svg>
   ),
 };
@@ -168,7 +170,17 @@ const adminItem = {
 
 const STORAGE_KEY = "sidebar_collapsed";
 
-export default function Sidebar({ isAdmin, mobileMode, onNavigate }: SidebarProps) {
+// Компонент красного кружка-бейджа
+function Badge({ count }: { count?: number }) {
+  if (!count || count <= 0) return null;
+  return (
+    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold leading-none px-1">
+      {count > 99 ? "99+" : count}
+    </span>
+  );
+}
+
+export default function Sidebar({ isAdmin, mobileMode, onNavigate, badges }: SidebarProps) {
   const { projectId } = useParams();
   const { isPortalAdmin } = useAuth();
   const { hasPermission } = useProject();
@@ -288,7 +300,10 @@ export default function Sidebar({ isAdmin, mobileMode, onNavigate }: SidebarProp
             title={isCollapsed ? registryItem.label : undefined}
             onClick={handleLinkClick}
           >
-            {registryItem.icon}
+            <span className="relative shrink-0">
+              {registryItem.icon}
+              <Badge count={badges?.registry} />
+            </span>
             {!isCollapsed && <span className="truncate">{registryItem.label}</span>}
           </NavLink>
         )}
@@ -301,7 +316,10 @@ export default function Sidebar({ isAdmin, mobileMode, onNavigate }: SidebarProp
             title={isCollapsed ? requestItem.label : undefined}
             onClick={handleLinkClick}
           >
-            {requestItem.icon}
+            <span className="relative shrink-0">
+              {requestItem.icon}
+              <Badge count={badges?.requests} />
+            </span>
             {!isCollapsed && <span className="truncate">{requestItem.label}</span>}
           </NavLink>
         )}
@@ -314,7 +332,10 @@ export default function Sidebar({ isAdmin, mobileMode, onNavigate }: SidebarProp
             title={isCollapsed ? fileshareItem.label : undefined}
             onClick={handleLinkClick}
           >
-            {fileshareItem.icon}
+            <span className="relative shrink-0">
+              {fileshareItem.icon}
+              <Badge count={badges?.fileshare} />
+            </span>
             {!isCollapsed && <span className="truncate">{fileshareItem.label}</span>}
           </NavLink>
         )}

@@ -60,7 +60,12 @@ export default function RegistryMobileView({
         >
           <div className="flex items-start justify-between gap-2 mb-1.5">
             <div className="min-w-0 flex-1">
-              <div className="font-medium text-sm truncate" style={{ color: "var(--ds-text)" }}>{cell.name}</div>
+              <div className="font-medium text-sm truncate flex items-center gap-1.5" style={{ color: "var(--ds-text)" }}>
+                {cell.assigned_to === userId && cell.send_type && (
+                  <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" title="Требует действия" />
+                )}
+                {cell.name}
+              </div>
               <div className="text-xs mt-0.5" style={{ color: "var(--ds-text-faint)" }}>{formatDate(cell.created_at)}</div>
             </div>
             <span
