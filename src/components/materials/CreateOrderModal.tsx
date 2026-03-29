@@ -362,9 +362,9 @@ export default function CreateOrderModal({ onClose, onCreated, editOrder }: Prop
                   </button>
                 </span>
               ))}
-              <label className="ds-btn-secondary text-xs px-3 py-1.5 cursor-pointer">
+              <label className="ds-btn-secondary text-xs px-3 py-1.5 cursor-pointer inline-flex items-center">
                 + Добавить файл
-                <input type="file" className="hidden" multiple onChange={handleFileChange} />
+                <input type="file" style={{ position: "absolute", width: 0, height: 0, opacity: 0, overflow: "hidden" }} multiple onChange={handleFileChange} />
               </label>
             </div>
           </div>

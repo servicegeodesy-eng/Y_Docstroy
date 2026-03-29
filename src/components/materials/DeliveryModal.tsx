@@ -131,7 +131,7 @@ export default function DeliveryModal({ order, onClose, onSaved }: Props) {
             </div>
 
             {rows.map((row, idx) => {
-              const remaining = row.ordered - row.already_delivered;
+              const remaining = Number(row.ordered || 0) - Number(row.already_delivered || 0);
               return (
                 <div
                   key={row.order_item_id}
