@@ -249,7 +249,8 @@ router.get('/download', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const bucket = getBucketName(bucketKey);
+    // Новый формат пути (company/projects/...) → единый бакет
+    const bucket = filePath.includes('/projects/') ? MAIN_BUCKET : getBucketName(bucketKey);
 
     const command = new GetObjectCommand({ Bucket: bucket, Key: filePath });
     const response = await s3Client.send(command);
@@ -288,7 +289,7 @@ router.get('/signed-url', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const bucket = getBucketName(bucketKey);
+    const bucket = filePath.includes('/projects/') ? MAIN_BUCKET : getBucketName(bucketKey);
     const command = new GetObjectCommand({ Bucket: bucket, Key: filePath });
     const url = await getSignedUrl(s3Client, command, { expiresIn });
 
@@ -309,14 +310,24 @@ router.post('/remove', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const bucket = getBucketName(bucketKey);
+    // Разделяем пути по бакетам: новый формат → MAIN_BUCKET, старый → legacy
+    const newFormatPaths = paths.filter((p: string) => p.includes('/projects/'));
+    const legacyPaths = paths.filter((p: string) => !p.includes('/projects/'));
 
-    await s3Client.send(new DeleteObjectsCommand({
-      Bucket: bucket,
-      Delete: {
-        Objects: paths.map((key: string) => ({ Key: key })),
-      },
-    }));
+    if (newFormatPaths.length > 0) {
+      await s3Client.send(new DeleteObjectsCommand({
+        Bucket: MAIN_BUCKET,
+        Delete: { Objects: newFormatPaths.map((key: string) => ({ Key: key })) },
+      }));
+    }
+
+    if (legacyPaths.length > 0) {
+      const bucket = getBucketName(bucketKey);
+      await s3Client.send(new DeleteObjectsCommand({
+        Bucket: bucket,
+        Delete: { Objects: legacyPaths.map((key: string) => ({ Key: key })) },
+      }));
+    }
 
     res.json({ ok: true });
   } catch (err) {

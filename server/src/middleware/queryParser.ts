@@ -130,6 +130,10 @@ const ALLOWED_TABLES = new Set([
   'support_messages', 'support_message_files', 'support_blocked_users', 'support_read_status',
   'file_shares', 'file_share_recipients', 'file_share_files', 'file_share_overlay_masks',
   'push_subscriptions', 'notifications', 'refresh_tokens',
+  'companies', 'company_members', 'project_companies', 'subscriptions',
+  'company_tpl_buildings', 'company_tpl_floors', 'company_tpl_constructions',
+  'company_tpl_work_types', 'company_tpl_work_stages', 'company_tpl_sets',
+  'company_tpl_organizations',
 ]);
 
 export function isAllowedTable(table: string): boolean {
