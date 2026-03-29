@@ -48,9 +48,13 @@ router.get('/:table', async (req: AuthRequest, res: Response) => {
 
     const { text, values } = buildSelectSQL(table, req);
     if (process.env.NODE_ENV !== 'production') {
-      console.log(`[SQL] ${table}: ${text.substring(0, 200)}`);
+      console.log(`[SQL] ${table}: ${text}`);
+      console.log(`[SQL] values:`, values);
     }
     const result = await pool.query(text, values);
+    if (process.env.NODE_ENV !== 'production' && (table === 'cell_overlay_masks' || table.startsWith('company_tpl'))) {
+      console.log(`[SQL] ${table} → ${result.rows.length} rows`);
+    }
 
     const isCountOnly = req.query.head === 'true';
     if (isCountOnly) {
