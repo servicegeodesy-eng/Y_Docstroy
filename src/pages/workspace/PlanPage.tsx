@@ -123,6 +123,7 @@ export default function PlanPage({ mode = "plan" }: Props) {
   const [selOverlay, setSelOverlay] = useState(() => loadSaved(mode).overlay);
   const [selWork, setSelWork] = useState("");
   const [viewMode, setViewMode] = useState<"overlay" | "chessboard">("overlay");
+  const [hasZoneWorkTypes, setHasZoneWorkTypes] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [detailCellId, setDetailCellId] = useState<string | null>(null);
   const [detailRequestId, setDetailRequestId] = useState<string | null>(null);
@@ -184,6 +185,18 @@ export default function PlanPage({ mode = "plan" }: Props) {
   useEffect(() => {
     loadDicts();
   }, [loadDicts]);
+
+  // Проверить наличие связей зоны с видами работ (для переключателя шахматки)
+  useEffect(() => {
+    if (!CONSTRUCTION_MODES.has(mode)) return;
+    supabase
+      .from("dict_zone_work_types")
+      .select("id")
+      .eq("project_id", projectId!)
+      .eq("zone_type", mode)
+      .limit(1)
+      .then(({ data }) => setHasZoneWorkTypes((data?.length || 0) > 0));
+  }, [mode, projectId]);
 
   const showFloor = true;
   const showConstruction = true;
@@ -453,7 +466,7 @@ export default function PlanPage({ mode = "plan" }: Props) {
           <h2 className={`font-semibold ${isMobile ? "text-lg" : "text-xl"}`} style={{ color: "var(--ds-text)" }}>{title}</h2>
         </div>
         <div className="flex items-center gap-2" data-print-hide>
-          {CONSTRUCTION_MODES.has(mode) && (
+          {CONSTRUCTION_MODES.has(mode) && hasZoneWorkTypes && (
             <div className="flex rounded-lg border overflow-hidden" style={{ borderColor: "var(--ds-border)" }}>
               <button
                 onClick={() => setViewMode("overlay")}
