@@ -33,6 +33,7 @@ import badgeRoutes from './routes/badges';
 import rpcRoutes from './routes/rpc';
 import inviteRoutes from './routes/invites';
 import subscriptionRoutes from './routes/subscriptions';
+import materialRoutes from './routes/materials';
 import companyRoutes from './routes/companies';
 import genericRoutes from './routes/generic';
 
@@ -90,6 +91,7 @@ app.use('/api/badges', badgeRoutes);
 app.use('/api/rpc', rpcRoutes);
 app.use('/api/invites', inviteRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/materials', materialRoutes);
 
 // Generic CRUD fallback (MUST be last — catches /api/query/:table)
 app.use('/api/query', genericRoutes);
