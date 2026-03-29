@@ -8,6 +8,7 @@ const ZONES: Zone[] = [
   { id: "facade",      label: "Фасад",                   path: "facades" },
   { id: "frame",       label: "Каркас",                   path: "chessboard" },
   { id: "walls",       label: "Стены",                    path: "chessboard" },
+  { id: "floors",      label: "Полы и потолки",            path: "plan" },
   { id: "territory",   label: "Территория строительства", path: "plan" },
   { id: "landscaping", label: "Благоустройство",          path: "landscaping" },
   { id: "earthwork",   label: "Объёмы земляных масс",     path: "plan" },
@@ -172,7 +173,7 @@ export default function ConstructionMapPage() {
 
   // LEFT column labels (above ground): Кровля, Фасад, Каркас, Стены
   const lcX = VL + 4;
-  const aboveY = { roof: VT + 6, facade: VT + 38, walls: VT + 70, frame: VT + 102 };
+  const aboveY = { roof: VT + 6, facade: VT + 34, floors: VT + 62, walls: VT + 90, frame: VT + 118 };
 
   // LEFT column labels (below ground): Основание, Ограждение, Сваи — SAME position
   const belowY = { foundation: GL + 10, pit: GL + 46, piles: GL + 92 };
@@ -232,6 +233,20 @@ export default function ConstructionMapPage() {
           ))}
           <FramedLabel x={lcX} y={aboveY.frame} text="Каркас" dk={dk} id="frame" hovered={hovered}
             lineFromX={FX + FW * 0.4} lineFromY={FY + FH * 0.7} />
+        </g>
+
+        {/* FLOORS — strips above and below floor slabs in frame */}
+        <g {...zoneProps("floors")}>
+          {frameRows.map((sy, i) => (
+            <g key={`floor-${i}`}>
+              {/* Strip above slab */}
+              <rect x={FX + 2} y={sy - 9} width={FW - 4} height="5" fill={dk ? "#4a6070" : "#b8c8d8"} opacity="0.6" rx="1" />
+              {/* Strip below slab */}
+              <rect x={FX + 2} y={sy + 4} width={FW - 4} height="5" fill={dk ? "#4a5a68" : "#c8d4e0"} opacity="0.5" rx="1" />
+            </g>
+          ))}
+          <FramedLabel x={lcX} y={aboveY.floors} text="Полы и потолки" dk={dk} id="floors" hovered={hovered}
+            lineFromX={FX + FW * 0.3} lineFromY={frameRows[2] - 7} />
         </g>
 
         {/* WALLS — brick infill in frame */}
