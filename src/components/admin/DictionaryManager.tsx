@@ -8,6 +8,7 @@ import DictionaryLinkEditor from "./DictionaryLinkEditor";
 import BuildingFloorLinkEditor from "./BuildingFloorLinkEditor";
 import OverlayManager from "./OverlayManager";
 import AxisGridManager from "./AxisGridManager";
+import ZoneWorkTypeManager from "./ZoneWorkTypeManager";
 
 interface DictionaryConfig {
   name: string;
@@ -33,6 +34,7 @@ export default function DictionaryManager() {
   const [showStatuses, setShowStatuses] = useState(false);
   const [showOverlays, setShowOverlays] = useState(false);
   const [showAxisGrids, setShowAxisGrids] = useState(false);
+  const [showZones, setShowZones] = useState(false);
 
   if (showStatuses) {
     return <StatusManager onBack={() => setShowStatuses(false)} />;
@@ -44,6 +46,10 @@ export default function DictionaryManager() {
 
   if (showAxisGrids) {
     return <AxisGridManager onBack={() => setShowAxisGrids(false)} />;
+  }
+
+  if (showZones) {
+    return <ZoneWorkTypeManager onBack={() => setShowZones(false)} />;
   }
 
 
@@ -102,6 +108,20 @@ export default function DictionaryManager() {
         </button>
       )}
 
+      {/* Карточка зон строительства */}
+      <button
+        onClick={() => setShowZones(true)}
+        className="ds-card p-5 text-left group cursor-pointer"
+      >
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="font-medium" style={{ color: "var(--ds-text)" }}>Зоны строительства</h3>
+          <svg className="w-4 h-4 transition-colors" style={{ color: "var(--ds-text-faint)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+        <p className="text-sm" style={{ color: "var(--ds-text-muted)" }}>Виды работ для шахматки зон</p>
+      </button>
+
       {DICTIONARIES.map((dict) => (
         <button
           key={dict.table}
@@ -144,6 +164,7 @@ const LINK_TABLES_MAP: Record<string, { table: string; column: string }[]> = {
     { table: "dict_work_type_constructions", column: "work_type_id" },
     { table: "dict_work_type_sets", column: "work_type_id" },
     { table: "dict_work_type_overlays", column: "work_type_id" },
+    { table: "dict_zone_work_types", column: "work_type_id" },
   ],
   dict_floors: [
     { table: "dict_building_work_type_floors", column: "floor_id" },

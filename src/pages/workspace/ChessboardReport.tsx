@@ -132,27 +132,23 @@ export default function ChessboardReport({ zoneMode }: ChessboardProps = {}) {
     }
 
     if (zoneMode) {
-      // Режим зоны: показать только данные подложек с данным tab_type
-      const zoneOverlays = new Set<string>();
-      for (const oId of overlayIds) {
-        if (overlayTabTypes.get(oId) === zoneMode) zoneOverlays.add(oId);
-      }
+      // Режим зоны: показать только виды работ, назначенные этой зоне в справочнике
+      const { data: zoneLinks } = await supabase
+        .from("dict_zone_work_types")
+        .select("work_type_id")
+        .eq("project_id", project.id)
+        .eq("zone_type", zoneMode);
+
       const inclWT = new Set<string>();
-      const inclFL = new Set<string>();
-      const inclCN = new Set<string>();
-      for (const r of wtOverlays) {
-        if (zoneOverlays.has(r.overlay_id)) inclWT.add(r.work_type_id);
-      }
-      for (const r of olFloors) {
-        if (zoneOverlays.has(r.overlay_id)) inclFL.add(r.floor_id);
-      }
-      for (const r of olConstructions) {
-        if (zoneOverlays.has(r.overlay_id)) inclCN.add(r.construction_id);
+      if (zoneLinks) {
+        for (const row of zoneLinks as { work_type_id: string }[]) {
+          inclWT.add(row.work_type_id);
+        }
       }
       setFilterMode("include");
       setFilteredWorkTypes2(inclWT);
-      setFilteredFloors2(inclFL);
-      setFilteredConstructions2(inclCN);
+      setFilteredFloors2(new Set());
+      setFilteredConstructions2(new Set());
     } else {
       // Обычная шахматка: исключить фасады/благоустройство и все новые типы зон
       const overlaysWithConstructions = new Set(olConstructions.map((r) => r.overlay_id));
@@ -281,11 +277,9 @@ export default function ChessboardReport({ zoneMode }: ChessboardProps = {}) {
     return cells.filter((c) => {
       if (!c.floor_id) return false;
       if (filterMode === "include") {
-        // Режим зоны: показать только ячейки, связанные с подложками зоны
-        const wtOk = filteredWorkTypes2.size === 0 || (c.work_type_id && filteredWorkTypes2.has(c.work_type_id));
-        const flOk = filteredFloors2.size === 0 || (c.floor_id && filteredFloors2.has(c.floor_id));
-        const cnOk = filteredConstructions2.size === 0 || (c.construction_id && filteredConstructions2.has(c.construction_id));
-        if (!wtOk && !flOk && !cnOk) return false;
+        // Режим зоны: показать только ячейки с видами работ, назначенными зоне
+        if (filteredWorkTypes2.size > 0 && (!c.work_type_id || !filteredWorkTypes2.has(c.work_type_id))) return false;
+        if (filteredWorkTypes2.size === 0) return false; // зона не настроена
       } else {
         // Обычная шахматка: исключить данные других зон
         if (c.work_type_id && filteredWorkTypes2.has(c.work_type_id)) return false;
@@ -318,7 +312,7 @@ export default function ChessboardReport({ zoneMode }: ChessboardProps = {}) {
       floors = allFloors
         .filter((f) => {
           if (f.sort > maxSort) return false;
-          if (filterMode === "include") return filteredFloors2.size === 0 || filteredFloors2.has(f.id);
+          if (filterMode === "include") return true;
           return !filteredFloors2.has(f.id);
         })
         .sort((a, b) => b.sort - a.sort);
