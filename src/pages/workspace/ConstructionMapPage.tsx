@@ -1,6 +1,8 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useTheme } from "../../lib/ThemeContext";
+import { api } from "@/lib/api";
+import { useProject } from "@/lib/ProjectContext";
 
 interface Zone { id: string; label: string; path: string }
 
@@ -18,11 +20,12 @@ const ZONES: Zone[] = [
   { id: "piles",       label: "Сваи",                     path: "piles" },
 ];
 
-function FramedLabel({ x, y, text, text2, anchor = "start", dk, id, hovered, lineFromX, lineFromY }: {
+function FramedLabel({ x, y, text, text2, anchor = "start", dk, id, hovered, lineFromX, lineFromY, workCount }: {
   x: number; y: number; text: string; text2?: string;
   anchor?: "start" | "middle" | "end";
   dk: boolean; id: string; hovered: string | null;
   lineFromX?: number; lineFromY?: number;
+  workCount?: number;
 }) {
   const isH = hovered === id;
   const lH = 16, padX = 8, padY = 5, charW = 7.2;
@@ -54,6 +57,12 @@ function FramedLabel({ x, y, text, text2, anchor = "start", dk, id, hovered, lin
       {lines.map((l, i) => (
         <text key={i} x={bx + padX} y={by + padY + (i + 1) * lH - 3} fontSize="12" fontWeight="600" fill={dk ? "#7aaad0" : "#1E3A5F"} style={{ pointerEvents: "none" }}>{l}</text>
       ))}
+      {workCount != null && workCount > 0 && (
+        <>
+          <circle cx={bx + bW - 2} cy={by - 2} r={8} fill="#ef4444" style={{ pointerEvents: "none" }} />
+          <text x={bx + bW - 2} y={by + 2} textAnchor="middle" fontSize="9" fontWeight="700" fill="#fff" style={{ pointerEvents: "none" }}>{workCount}</text>
+        </>
+      )}
     </>
   );
 }
@@ -123,10 +132,35 @@ function SvgDefs() {
   );
 }
 
+// tab_type подложки → zone id на карте
+const TAB_TO_ZONE: Record<string, string> = {
+  facades: "facade", landscaping: "landscaping", roof: "roof",
+  floors: "floors", walls: "walls", frame: "frame",
+  territory: "territory", earthwork: "earthwork",
+  foundation: "foundation", shoring: "pit", piles: "piles",
+};
+
 export default function ConstructionMapPage() {
   const { projectId } = useParams();
+  const { project } = useProject();
   const navigate = useNavigate();
   const [hovered, setHovered] = useState<string | null>(null);
+  const [zoneCounts, setZoneCounts] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (!project) return;
+    api.get<Record<string, number>>("/api/installation/zone-counts", { project_id: project.id }).then(r => {
+      if (r.data) {
+        const mapped: Record<string, number> = {};
+        for (const [tabType, count] of Object.entries(r.data)) {
+          const zoneId = TAB_TO_ZONE[tabType];
+          if (zoneId) mapped[zoneId] = (mapped[zoneId] || 0) + count;
+        }
+        setZoneCounts(mapped);
+      }
+    });
+  }, [project]);
+
   const go = useCallback((path: string) => navigate(`/projects/${projectId}/${path}`), [navigate, projectId]);
   const handleClick = (id: string) => { const z = ZONES.find(z => z.id === id); if (z) go(z.path); };
   const zoneProps = (id: string) => ({
@@ -205,7 +239,7 @@ export default function ConstructionMapPage() {
           {Array.from({ length: 9 }, (_, i) => FenceLeft + i * ((FenceRight - FenceLeft) / 8)).map(x => (
             <line key={`fp-${x}`} x1={x} y1={GL - 76} x2={x} y2={GL - 68} stroke={dk ? "#7aaad0" : "#2c5a8a"} strokeWidth="2" opacity="0.5" />
           ))}
-          <FramedLabel x={FenceRight - 6} y={GL - 74} text="Территория" text2="строительства" anchor="end" dk={dk} id="territory" hovered={hovered} />
+          <FramedLabel x={FenceRight - 6} y={GL - 74} text="Территория" text2="строительства" anchor="end" dk={dk} id="territory" hovered={hovered} workCount={zoneCounts["territory"]} />
         </g>
 
         {/* LANDSCAPING — LEFT side */}
@@ -220,7 +254,7 @@ export default function ConstructionMapPage() {
           <ellipse cx={LandX+94} cy={GL-14} rx="10" ry="7" fill={dk ? "#308030" : "#78c068"} opacity="0.5" />
           <path d={`M${LandX} ${GL-2}Q${LandX+40} ${GL-5} ${LandX+80} ${GL-2}Q${LandX+100} ${GL+1} ${LandX+LandW} ${GL-2}`}
             fill="none" stroke={dk ? "#6a7a8a" : "#b0a898"} strokeWidth="2.5" opacity="0.5" strokeLinecap="round" />
-          <FramedLabel x={lcX} y={GL - 56} text="Благоустройство" dk={dk} id="landscaping" hovered={hovered}
+          <FramedLabel x={lcX} y={GL - 56} text="Благоустройство" dk={dk} id="landscaping" hovered={hovered} workCount={zoneCounts["landscaping"]}
             lineFromX={LandX + 50} lineFromY={GL - 30} />
         </g>
 
@@ -233,7 +267,7 @@ export default function ConstructionMapPage() {
           {frameCols.map((cx, i) => (
             <rect key={`cl-${i}`} x={cx - 5} y={FY} width="10" height={FH} fill={p("pat-concrete", "pat-concrete-dk")} stroke={dk ? "#5a7a90" : "#7a8a9a"} strokeWidth="0.8" />
           ))}
-          <FramedLabel x={lcX} y={aboveY.frame} text="Каркас" dk={dk} id="frame" hovered={hovered}
+          <FramedLabel x={lcX} y={aboveY.frame} text="Каркас" dk={dk} id="frame" hovered={hovered} workCount={zoneCounts["frame"]}
             lineFromX={FX + 10} lineFromY={FY + FH * 0.8} />
         </g>
 
@@ -247,7 +281,7 @@ export default function ConstructionMapPage() {
               <rect x={FX + 2} y={sy + 4} width={FW - 4} height="5" fill={dk ? "#4a5a68" : "#c8d4e0"} opacity="0.5" rx="1" />
             </g>
           ))}
-          <FramedLabel x={lcX} y={aboveY.floors} text="Полы и потолки" dk={dk} id="floors" hovered={hovered}
+          <FramedLabel x={lcX} y={aboveY.floors} text="Полы и потолки" dk={dk} id="floors" hovered={hovered} workCount={zoneCounts["floors"]}
             lineFromX={FX + FW * 0.5} lineFromY={frameRows[1] + 5} />
         </g>
 
@@ -261,7 +295,7 @@ export default function ConstructionMapPage() {
                 fill={p("pat-brick", "pat-brick-dk")} stroke={dk ? "#5a5045" : "#b0a090"} strokeWidth="0.6" rx="1" />
             );
           }))}
-          <FramedLabel x={lcX} y={aboveY.walls} text="Стены" dk={dk} id="walls" hovered={hovered}
+          <FramedLabel x={lcX} y={aboveY.walls} text="Стены" dk={dk} id="walls" hovered={hovered} workCount={zoneCounts["walls"]}
             lineFromX={FX + FW * 0.6} lineFromY={FY + FH * 0.45} />
         </g>
 
@@ -278,7 +312,7 @@ export default function ConstructionMapPage() {
           }))}
           <rect x={BX+78} y={BY+BH-48} width="54" height="48" rx="3" fill={dk ? "#2a3848" : "#5a4a3a"} stroke={dk ? "#4a6070" : "#4a3a2a"} strokeWidth="1.5" />
           <circle cx={BX+122} cy={BY+BH-22} r="3" fill={dk ? "#8ab0d0" : "#c8a868"} />
-          <FramedLabel x={lcX} y={aboveY.facade} text="Фасад" dk={dk} id="facade" hovered={hovered}
+          <FramedLabel x={lcX} y={aboveY.facade} text="Фасад" dk={dk} id="facade" hovered={hovered} workCount={zoneCounts["facade"]}
             lineFromX={BX + BW / 2} lineFromY={BY + 10} />
         </g>
 
@@ -291,7 +325,7 @@ export default function ConstructionMapPage() {
             const ly = RoofPeak + (BY - RoofPeak) * t, mid = (RoofLeft + RoofRight) / 2;
             return <line key={`rt-${t}`} x1={RoofLeft+(mid-RoofLeft)*(1-t)+10} y1={ly} x2={RoofRight-(RoofRight-mid)*(1-t)-10} y2={ly} stroke={dk ? "#4a6888" : "#4a6888"} strokeWidth="0.6" opacity="0.4" />;
           })}
-          <FramedLabel x={lcX} y={aboveY.roof} text="Кровля" dk={dk} id="roof" hovered={hovered}
+          <FramedLabel x={lcX} y={aboveY.roof} text="Кровля" dk={dk} id="roof" hovered={hovered} workCount={zoneCounts["roof"]}
             lineFromX={(RoofLeft + RoofRight) / 2 - 20} lineFromY={RoofPeak + (BY - RoofPeak) * 0.35} />
         </g>
 
@@ -300,7 +334,7 @@ export default function ConstructionMapPage() {
           <path d={`M${PileX-PileW/2} ${GL} Q${PileX-PileW/2+8} ${GL-PileH*0.6} ${PileX-PileW/4} ${GL-PileH*0.85} Q${PileX} ${GL-PileH-4} ${PileX+PileW/4} ${GL-PileH*0.8} Q${PileX+PileW/2-8} ${GL-PileH*0.5} ${PileX+PileW/2} ${GL}Z`}
             fill={p("pat-pile", "pat-pile-dk")} stroke={dk ? "#5a5040" : "#8a7a60"} strokeWidth="1.5" strokeLinejoin="round" />
           <path d={`M${PileX-PileW/2+10} ${GL-PileH*0.3}Q${PileX} ${GL-PileH*0.4} ${PileX+PileW/2-10} ${GL-PileH*0.25}`} fill="none" stroke={dk ? "#6a6050" : "#a09070"} strokeWidth="0.8" opacity="0.5" />
-          <FramedLabel x={rcX} y={GL + 10} text="Объёмы" text2="земляных масс" anchor="end" dk={dk} id="earthwork" hovered={hovered}
+          <FramedLabel x={rcX} y={GL + 10} text="Объёмы" text2="земляных масс" anchor="end" dk={dk} id="earthwork" hovered={hovered} workCount={zoneCounts["earthwork"]}
             lineFromX={PileX + PileW / 4} lineFromY={GL - PileH / 2} />
         </g>
 
@@ -312,7 +346,7 @@ export default function ConstructionMapPage() {
             fill={p("pat-sheet", "pat-sheet-dk")} stroke={dk ? "#5a7a90" : "#5a7a9a"} strokeWidth="1.5" />
           <rect x={ShoringLeft+SheetW} y={PitTop} width={ShoringRight-ShoringLeft-SheetW*2} height={PitH}
             fill={dk ? "#141e2e" : "#e4dcd0"} stroke={dk ? "#3a4a5a" : "#a09888"} strokeWidth="0.5" />
-          <FramedLabel x={lcX} y={belowY.pit} text="Ограждение" text2="котлована" dk={dk} id="pit" hovered={hovered}
+          <FramedLabel x={lcX} y={belowY.pit} text="Ограждение" text2="котлована" dk={dk} id="pit" hovered={hovered} workCount={zoneCounts["pit"]}
             lineFromX={ShoringLeft + SheetW / 2} lineFromY={(ShoringTop + ShoringBottom) / 2} />
         </g>
 
@@ -320,7 +354,7 @@ export default function ConstructionMapPage() {
         <g {...zoneProps("foundation")}>
           <rect x={ShoringLeft+SheetW} y={ShoringTop} width={ShoringRight-ShoringLeft-SheetW*2} height={FoundH}
             fill={p("pat-concrete", "pat-concrete-dk")} stroke={dk ? "#5a7a90" : "#7a8a9a"} strokeWidth="1.5" />
-          <FramedLabel x={lcX} y={belowY.foundation} text="Основание" dk={dk} id="foundation" hovered={hovered}
+          <FramedLabel x={lcX} y={belowY.foundation} text="Основание" dk={dk} id="foundation" hovered={hovered} workCount={zoneCounts["foundation"]}
             lineFromX={ShoringLeft + SheetW + 50} lineFromY={ShoringTop + FoundH / 2} />
         </g>
 
@@ -334,7 +368,7 @@ export default function ConstructionMapPage() {
               <polygon points={`${px-4},${pTop+pLen} ${px},${pTop+pLen+8} ${px+4},${pTop+pLen}`} fill={dk ? "#3b4a5c" : "#b0bcc8"} stroke={dk ? "#5a7a90" : "#7a8a9a"} strokeWidth="0.8" />
             </g>);
           })}
-          <FramedLabel x={lcX} y={belowY.piles} text="Сваи" dk={dk} id="piles" hovered={hovered}
+          <FramedLabel x={lcX} y={belowY.piles} text="Сваи" dk={dk} id="piles" hovered={hovered} workCount={zoneCounts["piles"]}
             lineFromX={ShoringLeft + SheetW + 24} lineFromY={PitTop + PileLen * 0.4} />
         </g>
       </svg>

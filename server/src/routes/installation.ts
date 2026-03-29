@@ -464,4 +464,32 @@ router.delete('/masks/:id', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// GET /api/installation/zone-counts?project_id=... — количество работ по зонам
+router.get('/zone-counts', async (req: AuthRequest, res: Response) => {
+  try {
+    const projectId = req.query.project_id as string;
+    if (!projectId) { res.status(400).json({ error: 'project_id обязателен' }); return; }
+
+    const result = await pool.query(
+      `SELECT do.tab_type, count(DISTINCT iw.id)::int as work_count
+       FROM cell_overlay_masks m
+       JOIN installation_works iw ON iw.id = m.work_id
+       JOIN dict_overlays do ON do.id = m.overlay_id
+       WHERE iw.project_id = $1 AND iw.status IN ('planned', 'in_progress')
+         AND do.tab_type IS NOT NULL
+       GROUP BY do.tab_type`,
+      [projectId]
+    );
+
+    const counts: Record<string, number> = {};
+    for (const r of result.rows) {
+      counts[r.tab_type] = r.work_count;
+    }
+    res.json(counts);
+  } catch (err) {
+    console.error('Zone counts error:', err);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
 export default router;
