@@ -97,6 +97,7 @@ export default function CellFileSection({ cellId, files, isLocked, isSent, canMo
   async function handleVersionUpload(fileToUpdate: CellFile, e: React.ChangeEvent<HTMLInputElement>) {
     if (!e.target.files?.[0] || !user || !project) return;
     const newFile = e.target.files[0];
+    setUploading(true);
 
     const { data: versions } = await supabase
       .from("cell_file_versions")
@@ -119,7 +120,7 @@ export default function CellFileSection({ cellId, files, isLocked, isSent, canMo
       file_name: oldVersionName, file_size: fileToUpdate.file_size,
       mime_type: fileToUpdate.mime_type, storage_path: fileToUpdate.storage_path, uploaded_by: user.id,
     });
-    if (versionErr) { console.error("Version insert error:", versionErr); return; }
+    if (versionErr) { console.error("Version insert error:", versionErr); setUploading(false); return; }
 
     // Новая версия файла
     const newVersionNumber = oldVersionNumber + 1;
@@ -130,6 +131,7 @@ export default function CellFileSection({ cellId, files, isLocked, isSent, canMo
       await supabase.from("cell_file_versions").delete()
         .eq("file_id", fileToUpdate.id).eq("version_number", oldVersionNumber);
       console.error("Upload error, version record removed:", uploadErr);
+      setUploading(false);
       return;
     }
 
@@ -147,6 +149,7 @@ export default function CellFileSection({ cellId, files, isLocked, isSent, canMo
       await supabase.from("cell_file_versions").delete()
         .eq("file_id", fileToUpdate.id).eq("version_number", oldVersionNumber);
       console.error("Update error, upload and version removed:", updateErr);
+      setUploading(false);
       return;
     }
 
@@ -155,6 +158,7 @@ export default function CellFileSection({ cellId, files, isLocked, isSent, canMo
       details: { file_name: newDisplayName, version: newVersionNumber },
     });
 
+    setUploading(false);
     onFilesChanged();
     if (versionFileId === fileToUpdate.id) loadFileVersions(fileToUpdate.id);
   }
@@ -212,7 +216,15 @@ export default function CellFileSection({ cellId, files, isLocked, isSent, canMo
   }
 
   return (
-    <div>
+    <div className="relative">
+      {uploading && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg" style={{ background: "color-mix(in srgb, var(--ds-surface) 80%, transparent)" }}>
+          <div className="flex items-center gap-2 px-4 py-2 rounded-lg" style={{ background: "var(--ds-surface-elevated)", boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }}>
+            <div className="ds-spinner w-4 h-4" />
+            <span className="text-sm font-medium" style={{ color: "var(--ds-text)" }}>Загрузка файла...</span>
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between mb-2">
         <h4 className="text-sm font-medium" style={{ color: "var(--ds-text-muted)" }}>Файлы ({files.length})</h4>
         {(canAddFiles !== undefined ? canAddFiles : (hasPermission("can_edit_cell") && canModifyFiles)) && (
@@ -321,9 +333,9 @@ export default function CellFileSection({ cellId, files, isLocked, isSent, canMo
                     </button>
                   )}
                   {(canUpdateFiles !== undefined ? canUpdateFiles : (hasPermission("can_edit_cell") && canModifyFiles)) && (
-                    <label className="ds-btn-secondary px-2 py-0.5 text-xs cursor-pointer" title="Загрузить новую версию">
-                      Обновить
-                      <input type="file" onChange={(e) => handleVersionUpload(f, e)} className="hidden" />
+                    <label className={`ds-btn-secondary px-2 py-0.5 text-xs ${uploading ? "opacity-50 pointer-events-none" : "cursor-pointer"}`} title="Загрузить новую версию">
+                      {uploading ? "Загрузка..." : "Обновить"}
+                      <input type="file" onChange={(e) => handleVersionUpload(f, e)} className="hidden" disabled={uploading} />
                     </label>
                   )}
                   {hasPermission("can_download_files") && (
