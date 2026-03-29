@@ -100,7 +100,7 @@ function loadSaved(mode: string): SavedSelection {
   } catch { return { building: "", workType: "", floor: "", construction: "", overlay: "" }; }
 }
 
-const CONSTRUCTION_MODES: Set<OverlayMode> = new Set(["roof", "floors", "walls", "frame", "territory", "earthwork", "foundation", "shoring", "piles"]);
+const CONSTRUCTION_MODES: Set<OverlayMode> = new Set(["facades", "landscaping", "roof", "floors", "walls", "frame", "territory", "earthwork", "foundation", "shoring", "piles"]);
 
 export default function PlanPage({ mode = "plan" }: Props) {
   const { projectId } = useParams();
