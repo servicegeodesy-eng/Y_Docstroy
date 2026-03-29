@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/AuthContext";
 import { shortName } from "@/lib/utils";
 import { useEligibleMembers } from "@/hooks/useEligibleMembers";
+import { markCellNotificationsRead } from "@/lib/notificationUtils";
 import type { Profile } from "@/types";
 
 interface Props {
@@ -62,6 +63,7 @@ function ForwardCellModal({ cellId, cellName, originalSenderId, onClose, onForwa
     });
 
     setLoading(false);
+    markCellNotificationsRead(cellId);
     onForwarded();
   }
 

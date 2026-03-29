@@ -4,6 +4,7 @@ import { uploadRawFile } from "@/lib/fileStorage";
 import { useProject } from "@/lib/ProjectContext";
 import { useAuth } from "@/lib/AuthContext";
 import { formatSize, getExt } from "@/lib/utils";
+import { markCellNotificationsRead } from "@/lib/notificationUtils";
 
 interface Props {
   cellId: string;
@@ -63,6 +64,7 @@ function ArchiveModal({ cellId, cellName, onClose, onArchived }: Props) {
     });
 
     setLoading(false);
+    markCellNotificationsRead(cellId);
     onArchived();
   }
 

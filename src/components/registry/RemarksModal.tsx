@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { useProject } from "@/lib/ProjectContext";
 import { useAuth } from "@/lib/AuthContext";
 import { formatSize } from "@/lib/utils";
+import { markCellNotificationsRead } from "@/lib/notificationUtils";
 
 interface Props {
   cellId: string;
@@ -91,6 +92,7 @@ function RemarksModal({ cellId, cellName, sendBackToUserId, onClose, onSent }: P
     });
 
     setLoading(false);
+    markCellNotificationsRead(cellId);
     onSent();
   }
 

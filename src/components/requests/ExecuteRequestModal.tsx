@@ -4,6 +4,7 @@ import { uploadCellFile, removeFiles } from "@/lib/fileStorage";
 import { useProject } from "@/lib/ProjectContext";
 import { useAuth } from "@/lib/AuthContext";
 import { formatSize } from "@/lib/utils";
+import { markCellNotificationsRead } from "@/lib/notificationUtils";
 
 interface Props {
   cellId: string;
@@ -73,6 +74,7 @@ function ExecuteRequestModal({ cellId, cellName, onClose, onExecuted }: Props) {
       });
 
       setLoading(false);
+      markCellNotificationsRead(cellId);
       onExecuted();
     } catch (err) {
       // Компенсация: удаляем загруженные файлы

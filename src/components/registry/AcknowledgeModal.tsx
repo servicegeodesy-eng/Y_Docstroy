@@ -1,6 +1,7 @@
 import { memo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/AuthContext";
+import { markCellNotificationsRead } from "@/lib/notificationUtils";
 
 interface Props {
   cellId: string;
@@ -46,6 +47,7 @@ function AcknowledgeModal({ cellId, cellName, onClose, onAcknowledged }: Props) 
     });
 
     setLoading(false);
+    markCellNotificationsRead(cellId);
     onAcknowledged();
   }
 

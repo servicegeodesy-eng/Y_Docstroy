@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/AuthContext";
 import { fullName } from "@/lib/utils";
 import { useEligibleMembers } from "@/hooks/useEligibleMembers";
+import { markCellNotificationsRead } from "@/lib/notificationUtils";
 
 interface Props {
   cellId: string;
@@ -39,6 +40,7 @@ function SendToAcknowledgeModal({ cellId, cellName, onClose, onSent }: Props) {
     });
 
     setLoading(false);
+    markCellNotificationsRead(cellId);
     onSent();
   }
 

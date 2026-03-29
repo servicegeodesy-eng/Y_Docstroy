@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/AuthContext";
 import { shortName } from "@/lib/utils";
 import { useEligibleMembers } from "@/hooks/useEligibleMembers";
+import { markCellNotificationsRead } from "@/lib/notificationUtils";
 import type { Profile } from "@/types";
 
 interface Props {
@@ -53,6 +54,7 @@ function DelegateCellModal({ cellId, cellName, originalSenderId, onClose, onDele
     });
 
     setLoading(false);
+    markCellNotificationsRead(cellId);
     onDelegated();
   }
 
