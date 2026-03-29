@@ -156,6 +156,66 @@ router.patch('/:table/:id', async (req: AuthRequest, res: Response) => {
 });
 
 // ============================================================================
+// PATCH /api/query/:table — UPDATE by filters (no id)
+// ============================================================================
+
+router.patch('/:table', async (req: AuthRequest, res: Response) => {
+  try {
+    const table = resolveTableName(req.params.table);
+    if (!isAllowedTable(table)) {
+      res.status(400).json({ error: `Таблица ${table} не поддерживается` });
+      return;
+    }
+
+    const { _filters, ...data } = req.body as Record<string, unknown>;
+    const filters = _filters as { column: string; op: string; value: unknown }[] | undefined;
+
+    if (!filters || filters.length === 0) {
+      res.status(400).json({ error: 'Фильтры обязательны для UPDATE без id' });
+      return;
+    }
+
+    const keys = Object.keys(data);
+    if (keys.length === 0) {
+      res.status(400).json({ error: 'Нечего обновлять' });
+      return;
+    }
+
+    const vals: unknown[] = keys.map(k => {
+      const v = data[k];
+      return v !== null && typeof v === 'object' ? JSON.stringify(v) : v;
+    });
+    const setClauses = keys.map((k, i) => `"${k}" = $${i + 1}`).join(', ');
+
+    const whereParts: string[] = [];
+    for (const f of filters) {
+      if (f.op === 'eq') {
+        vals.push(f.value);
+        whereParts.push(`"${f.column}" = $${vals.length}`);
+      } else if (f.op === 'in') {
+        vals.push(f.value);
+        whereParts.push(`"${f.column}" = ANY($${vals.length})`);
+      }
+    }
+
+    if (whereParts.length === 0) {
+      res.status(400).json({ error: 'Невалидные фильтры' });
+      return;
+    }
+
+    const result = await pool.query(
+      `UPDATE "${table}" SET ${setClauses} WHERE ${whereParts.join(' AND ')} RETURNING *`,
+      vals
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Generic PATCH (filtered) error:', (err as Error).message);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// ============================================================================
 // DELETE /api/query/:table/:id — DELETE single row
 // ============================================================================
 

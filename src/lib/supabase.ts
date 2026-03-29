@@ -314,6 +314,12 @@ class QueryBuilder<T = unknown> implements PromiseLike<QueryResult<T>> {
     const path = id ? `${this.getPath()}/${id}` : this.getPath();
 
     const body = this.bodyData as Record<string, unknown> || {};
+    // Если нет id-фильтра — передаём фильтры в body для PATCH по условиям
+    if (!id && this.filters.length > 0) {
+      (body as Record<string, unknown>)._filters = this.filters.map(f => ({
+        column: f.column, op: f.op, value: f.value,
+      }));
+    }
     const result = await api.patch<T>(path, body);
 
     if (result.error) {
