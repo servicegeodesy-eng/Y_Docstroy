@@ -50,7 +50,7 @@ export default function WorkProcessModal({ work, onClose, onUpdated }: Props) {
     ((work.materials || []) || []).map((m) => ({
       material_id: m.id,
       material_name: m.material_name,
-      unit_name: m.unit_name,
+      unit_name: m.unit_short,
       available_qty: m.available_qty,
       used_qty: "",
       delivered_inline: false,
@@ -146,7 +146,7 @@ export default function WorkProcessModal({ work, onClose, onUpdated }: Props) {
         return {
           material_id: m.id,
           material_name: m.material_name,
-          unit_name: m.unit_name,
+          unit_name: m.unit_short,
           unused_qty: unused,
           action: "remaining" as const,
           qty: String(unused),
@@ -507,7 +507,7 @@ function MaterialsSummary({ materials }: { materials: WorkMaterial[] }) {
               <div className="flex justify-between mb-1">
                 <span className="text-sm font-medium" style={{ color: "var(--ds-text)" }}>{m.material_name}</span>
                 <span className="text-xs" style={{ color: "var(--ds-text-muted)" }}>
-                  {m.used_qty}/{m.required_qty} {m.unit_name}
+                  {m.used_qty}/{m.required_qty} {m.unit_short}
                 </span>
               </div>
               <div className="h-2 rounded-full overflow-hidden" style={{ background: "var(--ds-border)" }}>

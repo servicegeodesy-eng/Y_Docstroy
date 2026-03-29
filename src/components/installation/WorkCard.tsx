@@ -2,10 +2,11 @@ import { useMobile } from "@/lib/MobileContext";
 
 export interface WorkMaterial {
   id: string;
+  order_item_id?: string;
+  order_number?: string;
   material_name: string;
-  unit_name: string;
+  unit_short: string;
   required_qty: number;
-  ordered_qty: number;
   available_qty: number;
   used_qty: number;
 }
@@ -23,6 +24,7 @@ export interface InstallationWork {
   completed_at: string | null;
   notes: string | null;
   created_by_name: string;
+  progress: number;
   materials: WorkMaterial[];
 }
 
@@ -86,7 +88,6 @@ export default function WorkCard({ work, onClick }: Props) {
       <div className="space-y-2">
         {(work.materials || []).slice(0, isMobile ? 2 : 4).map((mat) => {
           const max = Math.max(mat.required_qty, 1);
-          const orderedPct = Math.min((mat.ordered_qty / max) * 100, 100);
           const availablePct = Math.min((mat.available_qty / max) * 100, 100);
           const usedPct = Math.min((mat.used_qty / max) * 100, 100);
 
@@ -97,7 +98,7 @@ export default function WorkCard({ work, onClick }: Props) {
                   {mat.material_name}
                 </span>
                 <span className="ml-2 whitespace-nowrap" style={{ color: "var(--ds-text-muted)" }}>
-                  {mat.used_qty}/{mat.required_qty} {mat.unit_name}
+                  {mat.used_qty}/{mat.available_qty}/{mat.required_qty} {mat.unit_short}
                 </span>
               </div>
               {/* Stacked progress bar */}
@@ -106,11 +107,6 @@ export default function WorkCard({ work, onClick }: Props) {
                 style={{ background: "var(--ds-surface-sunken)" }}
               >
                 {/* Required = full gray background */}
-                {/* Ordered = blue layer */}
-                <div
-                  className="absolute inset-y-0 left-0 rounded-full"
-                  style={{ width: `${orderedPct}%`, background: "#3b82f6", opacity: 0.3 }}
-                />
                 {/* Available = green layer */}
                 <div
                   className="absolute inset-y-0 left-0 rounded-full"
@@ -136,7 +132,6 @@ export default function WorkCard({ work, onClick }: Props) {
       {(work.materials || []).length > 0 && (
         <div className="flex items-center gap-3 mt-2 pt-2 border-t" style={{ borderColor: "var(--ds-border)" }}>
           <LegendDot color="#9ca3af" label="Заявлено" />
-          <LegendDot color="#3b82f6" label="Заказано" />
           <LegendDot color="#22c55e" label="Доступно" />
           <LegendDot color="#f59e0b" label="Использовано" />
         </div>
