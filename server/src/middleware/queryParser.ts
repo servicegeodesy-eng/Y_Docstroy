@@ -144,6 +144,13 @@ const ALLOWED_TABLES = new Set([
   'company_tpl_buildings', 'company_tpl_floors', 'company_tpl_constructions',
   'company_tpl_work_types', 'company_tpl_work_stages', 'company_tpl_sets',
   'company_tpl_organizations',
+  'dict_units', 'dict_materials',
+  'material_orders', 'material_order_items', 'material_order_files',
+  'material_deliveries', 'material_delivery_files',
+  'installation_works', 'installation_materials', 'installation_log',
+  'installation_files', 'material_dispositions',
+  'invites', 'project_templates', 'subscription_plans', 'company_subscriptions',
+  'subscription_history',
 ]);
 
 export function isAllowedTable(table: string): boolean {

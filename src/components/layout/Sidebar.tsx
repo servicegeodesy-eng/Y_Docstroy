@@ -157,6 +157,39 @@ const fileshareItem = {
   ),
 };
 
+// РМ Производителя работ
+const materialsItem = {
+  path: "materials",
+  label: "Материалы",
+  icon: (
+    <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+    </svg>
+  ),
+};
+
+const installationItem = {
+  path: "installation",
+  label: "Монтаж",
+  icon: (
+    <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+    </svg>
+  ),
+};
+
+const geodesyItem = {
+  path: "requests",
+  label: "Геодезия",
+  icon: (
+    <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="7" strokeWidth={1.5} />
+      <circle cx="12" cy="12" r="2" strokeWidth={1.5} />
+      <path strokeLinecap="round" strokeWidth={1.5} d="M12 2v5M12 17v5M2 12h5M17 12h5" />
+    </svg>
+  ),
+};
+
 const adminItem = {
   path: "admin",
   label: "Админ",
@@ -183,12 +216,13 @@ function Badge({ count }: { count?: number }) {
 export default function Sidebar({ isAdmin, mobileMode, onNavigate, badges }: SidebarProps) {
   const { projectId } = useParams();
   const { isPortalAdmin } = useAuth();
-  const { hasPermission } = useProject();
+  const { hasPermission, userRole } = useProject();
   const { theme, toggleTheme } = useTheme();
   const { canInstall, install } = usePwaInstall();
   const navigate = useNavigate();
   const canViewRequests = hasPermission("can_view_requests");
   const geo = isGeoMode();
+  const isWorkProducer = userRole === "Производитель работ";
   const [collapsed, setCollapsed] = useState(() => !mobileMode && localStorage.getItem(STORAGE_KEY) === "1");
   const [copied, setCopied] = useState(false);
 
@@ -292,46 +326,69 @@ export default function Sidebar({ isAdmin, mobileMode, onNavigate, badges }: Sid
       )}
 
       <nav className="flex-1 py-3 space-y-1 overflow-y-auto">
-        {/* Реестр */}
-        {!geo && (
-          <NavLink
-            to={`/projects/${projectId}/${registryItem.path}`}
-            className={linkClass}
-            title={isCollapsed ? registryItem.label : undefined}
-            onClick={handleLinkClick}
-          >
-            <span className="relative shrink-0">
-              {registryItem.icon}
-              <Badge count={badges?.registry} />
-            </span>
-            {!isCollapsed && <span className="truncate">{registryItem.label}</span>}
-          </NavLink>
+        {/* ═══ РМ Производителя работ (Прораба) ═══ */}
+        {!geo && isWorkProducer && (
+          <>
+            <NavLink to={`/projects/${projectId}/${materialsItem.path}`} className={linkClass}
+              title={isCollapsed ? materialsItem.label : undefined} onClick={handleLinkClick}>
+              {materialsItem.icon}
+              {!isCollapsed && <span className="truncate">{materialsItem.label}</span>}
+            </NavLink>
+
+            <NavLink to={`/projects/${projectId}/${installationItem.path}`} className={linkClass}
+              title={isCollapsed ? installationItem.label : undefined} onClick={handleLinkClick}>
+              {installationItem.icon}
+              {!isCollapsed && <span className="truncate">{installationItem.label}</span>}
+            </NavLink>
+
+            {canViewRequests && (
+              <NavLink to={`/projects/${projectId}/${geodesyItem.path}`} className={linkClass}
+                title={isCollapsed ? geodesyItem.label : undefined} onClick={handleLinkClick}>
+                <span className="relative shrink-0">
+                  {geodesyItem.icon}
+                  <Badge count={badges?.requests} />
+                </span>
+                {!isCollapsed && <span className="truncate">{geodesyItem.label}</span>}
+              </NavLink>
+            )}
+          </>
         )}
 
-        {/* Заявки */}
-        {canViewRequests && (
-          <NavLink
-            to={`/projects/${projectId}/${requestItem.path}`}
-            className={linkClass}
-            title={isCollapsed ? requestItem.label : undefined}
-            onClick={handleLinkClick}
-          >
-            <span className="relative shrink-0">
-              {requestItem.icon}
-              <Badge count={badges?.requests} />
-            </span>
-            {!isCollapsed && <span className="truncate">{requestItem.label}</span>}
-          </NavLink>
+        {/* ═══ РМ Геодезиста (все остальные роли) ═══ */}
+        {!geo && !isWorkProducer && (
+          <>
+            <NavLink to={`/projects/${projectId}/${registryItem.path}`} className={linkClass}
+              title={isCollapsed ? registryItem.label : undefined} onClick={handleLinkClick}>
+              <span className="relative shrink-0">
+                {registryItem.icon}
+                <Badge count={badges?.registry} />
+              </span>
+              {!isCollapsed && <span className="truncate">{registryItem.label}</span>}
+            </NavLink>
+
+            {canViewRequests && (
+              <NavLink to={`/projects/${projectId}/${requestItem.path}`} className={linkClass}
+                title={isCollapsed ? requestItem.label : undefined} onClick={handleLinkClick}>
+                <span className="relative shrink-0">
+                  {requestItem.icon}
+                  <Badge count={badges?.requests} />
+                </span>
+                {!isCollapsed && <span className="truncate">{requestItem.label}</span>}
+              </NavLink>
+            )}
+
+            <NavLink to={`/projects/${projectId}/${groItem.path}`} className={linkClass}
+              title={isCollapsed ? groItem.label : undefined} onClick={handleLinkClick}>
+              {groItem.icon}
+              {!isCollapsed && <span className="truncate">{groItem.label}</span>}
+            </NavLink>
+          </>
         )}
 
-        {/* Обмен файлами */}
+        {/* ═══ Общие вкладки (оба РМ) ═══ */}
         {!geo && (
-          <NavLink
-            to={`/projects/${projectId}/${fileshareItem.path}`}
-            className={linkClass}
-            title={isCollapsed ? fileshareItem.label : undefined}
-            onClick={handleLinkClick}
-          >
+          <NavLink to={`/projects/${projectId}/${fileshareItem.path}`} className={linkClass}
+            title={isCollapsed ? fileshareItem.label : undefined} onClick={handleLinkClick}>
             <span className="relative shrink-0">
               {fileshareItem.icon}
               <Badge count={badges?.fileshare} />
@@ -340,27 +397,9 @@ export default function Sidebar({ isAdmin, mobileMode, onNavigate, badges }: Sid
           </NavLink>
         )}
 
-        {/* ГРО */}
         {!geo && (
-          <NavLink
-            to={`/projects/${projectId}/${groItem.path}`}
-            className={linkClass}
-            title={isCollapsed ? groItem.label : undefined}
-            onClick={handleLinkClick}
-          >
-            {groItem.icon}
-            {!isCollapsed && <span className="truncate">{groItem.label}</span>}
-          </NavLink>
-        )}
-
-        {/* Проводник */}
-        {!geo && (
-          <NavLink
-            to={`/projects/${projectId}/${explorerItem.path}`}
-            className={linkClass}
-            title={isCollapsed ? explorerItem.label : undefined}
-            onClick={handleLinkClick}
-          >
+          <NavLink to={`/projects/${projectId}/${explorerItem.path}`} className={linkClass}
+            title={isCollapsed ? explorerItem.label : undefined} onClick={handleLinkClick}>
             {explorerItem.icon}
             {!isCollapsed && <span className="truncate">{explorerItem.label}</span>}
           </NavLink>

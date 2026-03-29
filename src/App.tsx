@@ -20,6 +20,8 @@ const RequestsPage = lazy(() => import("./pages/workspace/RequestsPage"));
 const FileSharePage = lazy(() => import("./pages/workspace/FileSharePage"));
 const StructurePage = lazy(() => import("./pages/workspace/StructurePage"));
 const ConstructionMapPage = lazy(() => import("./pages/workspace/ConstructionMapPage"));
+const MaterialsPage = lazy(() => import("./pages/workspace/MaterialsPage"));
+const InstallationPage = lazy(() => import("./pages/workspace/InstallationPage"));
 const InstallPage = lazy(() => import("./pages/InstallPage"));
 const InvitePage = lazy(() => import("./pages/InvitePage"));
 const LandingPage = lazy(() => import("./pages/LandingPage"));
@@ -121,6 +123,8 @@ export default function App() {
           {!geo && <Route path="foundation" element={<PlanPage mode="foundation" />} />}
           {!geo && <Route path="shoring" element={<PlanPage mode="shoring" />} />}
           {!geo && <Route path="piles" element={<PlanPage mode="piles" />} />}
+          <Route path="materials" element={<MaterialsPage />} />
+          <Route path="installation" element={<InstallationPage />} />
           <Route path="requests" element={<RequestsPage />} />
           {!geo && <Route path="fileshare" element={<FileSharePage />} />}
           {!geo && <Route path="gro" element={<GroPage />} />}
