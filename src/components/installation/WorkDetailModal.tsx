@@ -3,11 +3,9 @@ import { api } from "@/lib/api";
 import { useProject } from "@/lib/ProjectContext";
 import { useMobile } from "@/lib/MobileContext";
 import { formatSize, downloadStorage } from "@/lib/utils";
-import { getOverlayUrl } from "@/lib/overlayUrlCache";
 import type { WorkMaterial } from "./WorkCard";
 
 interface WorkFile { id: string; file_name: string; storage_path: string; file_size: number; category: string; created_at: string }
-interface WorkMask { id: string; overlay_id: string; polygon_points: { x: number; y: number }[] }
 interface WorkData {
   id: string; status: string; building_name: string; work_type_name: string;
   floor_name: string | null; construction_name: string | null;
@@ -38,17 +36,20 @@ export default function WorkDetailModal({ workId, onClose, onUpdated }: Props) {
     setLoading(true);
     const res = await api.get<WorkData>(`/api/installation/works/${workId}`);
     if (res.data) {
-      setWork({ ...res.data, materials: res.data.materials || [], files: res.data.files || [] });
+      const d = res.data;
+      setWork({
+        ...d,
+        progress: Number(d.progress) || 0,
+        materials: (d.materials || []).map((m: Record<string, unknown>) => ({
+          ...m,
+          required_qty: Number(m.required_qty) || 0,
+          available_qty: Number(m.available_qty) || 0,
+          used_qty: Number(m.used_qty) || 0,
+        })) as WorkMaterial[],
+        files: d.files || [],
+      });
     }
     setLoading(false);
-  }, [workId]);
-
-  // Load overlay preview for mask
-  useEffect(() => {
-    if (!workId) return;
-    api.get<WorkMask[]>("/api/installation/masks", { overlay_id: "" }).catch(() => {});
-    // Try to find mask → get overlay → get preview URL
-    // For simplicity, we'll load it from the work's overlay link
   }, [workId]);
 
   useEffect(() => { loadWork(); }, [loadWork]);
