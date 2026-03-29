@@ -197,7 +197,7 @@ function parseSelectString(selectStr: string, mainTable: string): { columns: str
     // Supabase format: alias:table!fk_column(cols) where alias≠fk
     // But old DocStroy code uses: profiles!created_by(cols) — table!fk
     // And: creator:profiles!created_by(cols) — alias:table!fk
-    const m = token.match(/^(?:(\w+):)?(\w+)(?:!(\w+))?\((.+)\)$/s);
+    const m = token.match(/^(?:(\w+):)?(\w+)(?:!(\w+))?\s*\((.+)\)$/s);
     if (m) {
       let [, alias, rawTable, modifier, innerContent] = m;
 
