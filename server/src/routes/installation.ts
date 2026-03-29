@@ -475,7 +475,7 @@ router.get('/zone-counts', async (req: AuthRequest, res: Response) => {
        FROM cell_overlay_masks m
        JOIN installation_works iw ON iw.id = m.work_id
        JOIN dict_overlays ov ON ov.id = m.overlay_id
-       WHERE iw.project_id = $1 AND iw.status IN ('planned', 'in_progress')
+       WHERE iw.project_id = $1 AND iw.status = 'in_progress'
          AND ov.tab_type IS NOT NULL
        GROUP BY ov.tab_type`,
       [projectId]
