@@ -1,10 +1,52 @@
 import { Router, Response } from 'express';
+import multer from 'multer';
+import { v4 as uuidv4 } from 'uuid';
+import path from 'path';
+import { PutObjectCommand } from '@aws-sdk/client-s3';
 import pool from '../config/db';
+import s3Client from '../config/s3';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { hasProjectAccess } from '../middleware/permissions';
 
 const router = Router();
 router.use(authMiddleware);
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+const MAIN_BUCKET = process.env.S3_BUCKET || 'docstroy';
+
+// POST /api/installation/files — загрузить файл/фото к работе
+router.post('/files', upload.single('file'), async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const file = req.file;
+    const workId = req.body.work_id;
+    const category = req.body.category || 'during';
+
+    if (!file || !workId) { res.status(400).json({ error: 'file и work_id обязательны' }); return; }
+
+    const work = await pool.query('SELECT project_id FROM installation_works WHERE id = $1', [workId]);
+    if (work.rows.length === 0) { res.status(404).json({ error: 'Работа не найдена' }); return; }
+
+    const projectId = work.rows[0].project_id;
+    const ext = path.extname(file.originalname);
+    const storagePath = `${projectId}/installation/${workId}/${uuidv4()}${ext}`;
+
+    await s3Client.send(new PutObjectCommand({
+      Bucket: MAIN_BUCKET, Key: storagePath, Body: file.buffer, ContentType: file.mimetype,
+    }));
+
+    const result = await pool.query(
+      `INSERT INTO installation_files (work_id, file_name, storage_path, file_size, mime_type, category, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [workId, file.originalname, storagePath, file.size, file.mimetype, category, userId]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error('Upload installation file error:', err);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
 
 // ============================================================================
 // GET /api/installation/works?project_id=...&status=...
