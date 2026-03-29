@@ -1,0 +1,114 @@
+import { useState, useEffect } from "react";
+import { api } from "@/lib/api";
+import { getOverlayUrl } from "@/lib/overlayUrlCache";
+import { supabase } from "@/lib/supabase";
+
+interface MaskData {
+  id: string;
+  overlay_id: string;
+  polygon_points: { x: number; y: number }[];
+}
+
+interface OverlayData {
+  id: string;
+  name: string;
+  storage_path: string;
+  width: number;
+  height: number;
+}
+
+interface Props {
+  workId: string;
+}
+
+export default function WorkMaskPreview({ workId }: Props) {
+  const [masks, setMasks] = useState<MaskData[]>([]);
+  const [overlay, setOverlay] = useState<OverlayData | null>(null);
+  const [imageUrl, setImageUrl] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      setLoading(true);
+
+      // Загружаем маски работы
+      const maskRes = await supabase
+        .from("cell_overlay_masks")
+        .select("id, overlay_id, polygon_points")
+        .eq("work_id", workId);
+
+      const workMasks = (maskRes.data || []) as MaskData[];
+      if (cancelled) return;
+
+      if (workMasks.length === 0) {
+        setLoading(false);
+        return;
+      }
+
+      setMasks(workMasks);
+
+      // Загружаем подложку
+      const overlayId = workMasks[0].overlay_id;
+      const ovRes = await supabase
+        .from("dict_overlays")
+        .select("id, name, storage_path, width, height")
+        .eq("id", overlayId)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      if (ovRes.data) {
+        const ov = ovRes.data as OverlayData;
+        setOverlay(ov);
+        const url = await getOverlayUrl(ov.storage_path);
+        if (!cancelled) setImageUrl(url);
+      }
+
+      setLoading(false);
+    }
+
+    load();
+    return () => { cancelled = true; };
+  }, [workId]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-4" style={{ color: "var(--ds-text-faint)" }}>
+        <div className="ds-spinner w-4 h-4" />
+      </div>
+    );
+  }
+
+  if (!overlay || !imageUrl || masks.length === 0) return null;
+
+  const aspectW = 1000;
+  const aspectH = (overlay.height / overlay.width) * aspectW;
+
+  return (
+    <div className="rounded-lg overflow-hidden border" style={{ borderColor: "var(--ds-border)" }}>
+      <svg viewBox={`0 0 ${aspectW} ${aspectH}`} className="w-full h-auto" style={{ background: "var(--ds-surface-sunken)" }}>
+        <image href={imageUrl} width={aspectW} height={aspectH} />
+        {masks.map((mask) => {
+          const points = (mask.polygon_points || [])
+            .map((p) => `${p.x * aspectW},${p.y * aspectH}`)
+            .join(" ");
+          return (
+            <polygon
+              key={mask.id}
+              points={points}
+              fill="rgba(59, 130, 246, 0.2)"
+              stroke="#3b82f6"
+              strokeWidth={2}
+              strokeDasharray="6 3"
+            />
+          );
+        })}
+      </svg>
+      <div className="px-2 py-1 text-[10px]" style={{ color: "var(--ds-text-faint)", background: "var(--ds-surface-sunken)" }}>
+        {overlay.name}
+      </div>
+    </div>
+  );
+}

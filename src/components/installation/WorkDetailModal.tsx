@@ -4,6 +4,7 @@ import { useProject } from "@/lib/ProjectContext";
 import { useMobile } from "@/lib/MobileContext";
 import { formatSize, downloadStorage } from "@/lib/utils";
 import type { WorkMaterial } from "./WorkCard";
+import WorkMaskPreview from "./WorkMaskPreview";
 
 interface WorkFile { id: string; file_name: string; storage_path: string; file_size: number; category: string; created_at: string }
 interface WorkData {
@@ -154,8 +155,11 @@ export default function WorkDetailModal({ workId, onClose, onUpdated }: Props) {
           </button>
         </div>
 
-        {/* Body — scrollable */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-5">
+        {/* Body — scrollable, two columns on desktop */}
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className={`${isMobile ? "" : "flex gap-6"}`}>
+          {/* Left column — info + materials + files */}
+          <div className={`space-y-5 ${isMobile ? "" : "flex-1 min-w-0"}`}>
           {/* Info */}
           <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
             <div><span className="text-xs" style={{ color: "var(--ds-text-faint)" }}>Место</span><p style={{ color: "var(--ds-text)" }}>{location}</p></div>
@@ -263,6 +267,20 @@ export default function WorkDetailModal({ workId, onClose, onUpdated }: Props) {
               </ul>
             )}
           </div>
+          </div>
+          {/* Right column — overlay preview */}
+          {!isMobile && (
+            <div className="min-w-0" style={{ flex: "1 1 0%", maxWidth: 320 }}>
+              <WorkMaskPreview workId={workId} />
+            </div>
+          )}
+          </div>
+          {/* Mobile — preview below */}
+          {isMobile && (
+            <div className="mt-4">
+              <WorkMaskPreview workId={workId} />
+            </div>
+          )}
         </div>
       </div>
     </div>
