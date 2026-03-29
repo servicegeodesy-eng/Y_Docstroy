@@ -111,6 +111,15 @@ export default function App() {
           {!geo && <Route path="chessboard" element={<ChessboardReport />} />}
           {!geo && <Route path="facades" element={<PlanPage mode="facades" />} />}
           {!geo && <Route path="landscaping" element={<PlanPage mode="landscaping" />} />}
+          {!geo && <Route path="roof" element={<PlanPage mode="roof" />} />}
+          {!geo && <Route path="floors" element={<PlanPage mode="floors" />} />}
+          {!geo && <Route path="walls" element={<PlanPage mode="walls" />} />}
+          {!geo && <Route path="frame" element={<PlanPage mode="frame" />} />}
+          {!geo && <Route path="territory" element={<PlanPage mode="territory" />} />}
+          {!geo && <Route path="earthwork" element={<PlanPage mode="earthwork" />} />}
+          {!geo && <Route path="foundation" element={<PlanPage mode="foundation" />} />}
+          {!geo && <Route path="shoring" element={<PlanPage mode="shoring" />} />}
+          {!geo && <Route path="piles" element={<PlanPage mode="piles" />} />}
           <Route path="requests" element={<RequestsPage />} />
           {!geo && <Route path="fileshare" element={<FileSharePage />} />}
           {!geo && <Route path="gro" element={<GroPage />} />}

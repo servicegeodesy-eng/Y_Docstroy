@@ -5,17 +5,17 @@ import { useTheme } from "../../lib/ThemeContext";
 interface Zone { id: string; label: string; path: string }
 
 const ZONES: Zone[] = [
-  { id: "roof",        label: "Кровля",                  path: "plan" },
+  { id: "roof",        label: "Кровля",                  path: "roof" },
   { id: "facade",      label: "Фасад",                   path: "facades" },
-  { id: "frame",       label: "Каркас",                   path: "chessboard" },
-  { id: "walls",       label: "Стены",                    path: "chessboard" },
-  { id: "floors",      label: "Полы и потолки",            path: "plan" },
-  { id: "territory",   label: "Территория строительства", path: "plan" },
+  { id: "frame",       label: "Каркас",                   path: "frame" },
+  { id: "walls",       label: "Стены",                    path: "walls" },
+  { id: "floors",      label: "Полы и потолки",            path: "floors" },
+  { id: "territory",   label: "Территория строительства", path: "territory" },
   { id: "landscaping", label: "Благоустройство",          path: "landscaping" },
-  { id: "earthwork",   label: "Объёмы земляных масс",     path: "plan" },
-  { id: "foundation",  label: "Основание",                path: "plan" },
-  { id: "pit",         label: "Ограждение котлована",      path: "plan" },
-  { id: "piles",       label: "Сваи",                     path: "plan" },
+  { id: "earthwork",   label: "Объёмы земляных масс",     path: "earthwork" },
+  { id: "foundation",  label: "Основание",                path: "foundation" },
+  { id: "pit",         label: "Ограждение котлована",      path: "shoring" },
+  { id: "piles",       label: "Сваи",                     path: "piles" },
 ];
 
 function FramedLabel({ x, y, text, text2, anchor = "start", dk, id, hovered, lineFromX, lineFromY }: {
