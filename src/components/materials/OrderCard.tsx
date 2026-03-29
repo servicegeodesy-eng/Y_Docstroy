@@ -24,7 +24,7 @@ export interface MaterialOrder {
 
 const STATUS_LABELS: Record<string, string> = {
   draft: "Черновик",
-  ordered: "Заказано",
+  ordered: "Ожидают поступления",
   partial: "Частично",
   delivered: "Доставлено",
 };

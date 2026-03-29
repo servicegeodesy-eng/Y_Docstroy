@@ -6,7 +6,7 @@ import { PutObjectCommand } from '@aws-sdk/client-s3';
 import pool from '../config/db';
 import s3Client from '../config/s3';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
-import { hasProjectAccess } from '../middleware/permissions';
+import { hasProjectAccess, isProjectAdmin, isPortalAdmin } from '../middleware/permissions';
 
 const router = Router();
 router.use(authMiddleware);
@@ -15,7 +15,79 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 
 const MAIN_BUCKET = process.env.S3_BUCKET || 'docstroy';
 
 // ============================================================================
-// GET /api/materials/orders?project_id=...&status=...
+// FILE UPLOAD routes MUST be before :id routes to avoid Express route conflict
+// ============================================================================
+
+// POST /api/materials/orders/files — загрузить файл к заказу
+router.post('/orders/files', upload.single('file'), async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const file = req.file;
+    const orderId = req.body.order_id;
+
+    if (!file || !orderId) {
+      res.status(400).json({ error: 'file и order_id обязательны' });
+      return;
+    }
+
+    const order = await pool.query('SELECT project_id FROM material_orders WHERE id = $1', [orderId]);
+    if (order.rows.length === 0) { res.status(404).json({ error: 'Заказ не найден' }); return; }
+
+    const projectId = order.rows[0].project_id;
+    const ext = path.extname(file.originalname);
+    const storagePath = `${projectId}/materials/${orderId}/${uuidv4()}${ext}`;
+
+    await s3Client.send(new PutObjectCommand({
+      Bucket: MAIN_BUCKET, Key: storagePath, Body: file.buffer, ContentType: file.mimetype,
+    }));
+
+    const result = await pool.query(
+      `INSERT INTO material_order_files (order_id, file_name, storage_path, file_size, mime_type, uploaded_by)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [orderId, file.originalname, storagePath, file.size, file.mimetype, userId]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error('Upload order file error:', err);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// POST /api/materials/deliveries/files — загрузить фото/файл поступления
+router.post('/deliveries/files', upload.single('file'), async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const file = req.file;
+    const deliveryId = req.body.delivery_id;
+
+    if (!file || !deliveryId) {
+      res.status(400).json({ error: 'file и delivery_id обязательны' });
+      return;
+    }
+
+    const ext = path.extname(file.originalname);
+    const storagePath = `deliveries/${deliveryId}/${uuidv4()}${ext}`;
+
+    await s3Client.send(new PutObjectCommand({
+      Bucket: MAIN_BUCKET, Key: storagePath, Body: file.buffer, ContentType: file.mimetype,
+    }));
+
+    const result = await pool.query(
+      `INSERT INTO material_delivery_files (delivery_id, file_name, storage_path, file_size, mime_type, uploaded_by)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [deliveryId, file.originalname, storagePath, file.size, file.mimetype, userId]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error('Upload delivery file error:', err);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// ============================================================================
+// GET /api/materials/orders?project_id=...&status=...&my=true
 // ============================================================================
 
 router.get('/orders', async (req: AuthRequest, res: Response) => {
@@ -23,6 +95,7 @@ router.get('/orders', async (req: AuthRequest, res: Response) => {
     const userId = req.userId!;
     const projectId = req.query.project_id as string;
     const status = req.query.status as string;
+    const myOnly = req.query.my === 'true';
 
     if (!projectId) { res.status(400).json({ error: 'project_id обязателен' }); return; }
     if (!await hasProjectAccess(userId, projectId)) { res.status(403).json({ error: 'Нет доступа' }); return; }
@@ -49,10 +122,16 @@ router.get('/orders', async (req: AuthRequest, res: Response) => {
       LEFT JOIN users u ON u.id = mo.created_by
       WHERE mo.project_id = $1`;
     const params: unknown[] = [projectId];
+    let paramIdx = 2;
 
     if (status) {
-      sql += ` AND mo.status = $2`;
+      sql += ` AND mo.status = $${paramIdx++}`;
       params.push(status);
+    }
+
+    if (myOnly) {
+      sql += ` AND mo.created_by = $${paramIdx++}`;
+      params.push(userId);
     }
 
     sql += ` ORDER BY mo.order_number DESC`;
@@ -179,6 +258,11 @@ router.patch('/orders/:id', async (req: AuthRequest, res: Response) => {
     const orderId = req.params.id;
     const { status, notes } = req.body;
 
+    const allowedStatuses = ['draft', 'ordered', 'pending', 'partial', 'delivered', 'cancelled'];
+    if (status && !allowedStatuses.includes(status)) {
+      res.status(400).json({ error: 'Недопустимый статус' }); return;
+    }
+
     const sets: string[] = [];
     const vals: unknown[] = [];
     let idx = 1;
@@ -204,6 +288,47 @@ router.patch('/orders/:id', async (req: AuthRequest, res: Response) => {
 });
 
 // ============================================================================
+// DELETE /api/materials/orders/:id — удалить заявку
+// ============================================================================
+
+router.delete('/orders/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const orderId = req.params.id;
+
+    const order = await pool.query(
+      'SELECT id, status, project_id, created_by FROM material_orders WHERE id = $1',
+      [orderId]
+    );
+    if (order.rows.length === 0) { res.status(404).json({ error: 'Заявка не найдена' }); return; }
+
+    const o = order.rows[0];
+    const userIsProjectAdmin = await isProjectAdmin(userId, o.project_id);
+    const userIsPortalAdmin = await isPortalAdmin(userId);
+
+    // Черновик может удалить автор или админ, другие статусы — только админ
+    if (o.status === 'draft') {
+      if (o.created_by !== userId && !userIsProjectAdmin && !userIsPortalAdmin) {
+        res.status(403).json({ error: 'Нет прав на удаление' }); return;
+      }
+    } else {
+      if (!userIsProjectAdmin && !userIsPortalAdmin) {
+        res.status(403).json({ error: 'Удалять не-черновики могут только администраторы' }); return;
+      }
+    }
+
+    await pool.query('DELETE FROM material_order_items WHERE order_id = $1', [orderId]);
+    await pool.query('DELETE FROM material_order_files WHERE order_id = $1', [orderId]);
+    await pool.query('DELETE FROM material_orders WHERE id = $1', [orderId]);
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Delete order error:', err);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// ============================================================================
 // POST /api/materials/deliveries — зафиксировать поступление
 // ============================================================================
 
@@ -218,14 +343,39 @@ router.post('/deliveries', async (req: AuthRequest, res: Response) => {
     }
 
     const results = [];
+    const skipped = [];
     for (const item of items) {
       if (!item.order_item_id || !item.quantity || item.quantity <= 0) continue;
+
+      // Проверка: не превышает ли количество остаток
+      const orderItem = await pool.query(
+        'SELECT quantity, delivered_qty FROM material_order_items WHERE id = $1',
+        [item.order_item_id]
+      );
+      if (orderItem.rows.length === 0) {
+        skipped.push({ order_item_id: item.order_item_id, reason: 'Позиция не найдена' });
+        continue;
+      }
+
+      const remaining = Number(orderItem.rows[0].quantity) - Number(orderItem.rows[0].delivered_qty);
+      if (item.quantity > remaining) {
+        skipped.push({
+          order_item_id: item.order_item_id,
+          reason: `Превышает остаток (макс: ${remaining})`,
+        });
+        continue;
+      }
 
       const result = await pool.query(
         'INSERT INTO material_deliveries (order_item_id, quantity, notes, created_by) VALUES ($1, $2, $3, $4) RETURNING *',
         [item.order_item_id, item.quantity, item.notes || null, userId]
       );
       results.push(result.rows[0]);
+    }
+
+    if (results.length === 0 && skipped.length > 0) {
+      res.status(400).json({ error: 'Не удалось зафиксировать поступление', skipped });
+      return;
     }
 
     res.status(201).json(results);
@@ -325,80 +475,6 @@ router.get('/nomenclature', async (req: AuthRequest, res: Response) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Get nomenclature error:', err);
-    res.status(500).json({ error: 'Ошибка сервера' });
-  }
-});
-
-// ============================================================================
-// POST /api/materials/orders/files — загрузить файл к заказу
-// ============================================================================
-
-router.post('/orders/files', upload.single('file'), async (req: AuthRequest, res: Response) => {
-  try {
-    const userId = req.userId!;
-    const file = req.file;
-    const orderId = req.body.order_id;
-
-    if (!file || !orderId) {
-      res.status(400).json({ error: 'file и order_id обязательны' });
-      return;
-    }
-
-    const order = await pool.query('SELECT project_id FROM material_orders WHERE id = $1', [orderId]);
-    if (order.rows.length === 0) { res.status(404).json({ error: 'Заказ не найден' }); return; }
-
-    const projectId = order.rows[0].project_id;
-    const ext = path.extname(file.originalname);
-    const storagePath = `${projectId}/materials/${orderId}/${uuidv4()}${ext}`;
-
-    await s3Client.send(new PutObjectCommand({
-      Bucket: MAIN_BUCKET, Key: storagePath, Body: file.buffer, ContentType: file.mimetype,
-    }));
-
-    const result = await pool.query(
-      `INSERT INTO material_order_files (order_id, file_name, storage_path, file_size, mime_type, uploaded_by)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [orderId, file.originalname, storagePath, file.size, file.mimetype, userId]
-    );
-
-    res.status(201).json(result.rows[0]);
-  } catch (err) {
-    console.error('Upload order file error:', err);
-    res.status(500).json({ error: 'Ошибка сервера' });
-  }
-});
-
-// ============================================================================
-// POST /api/materials/deliveries/files — загрузить фото/файл поступления
-// ============================================================================
-
-router.post('/deliveries/files', upload.single('file'), async (req: AuthRequest, res: Response) => {
-  try {
-    const userId = req.userId!;
-    const file = req.file;
-    const deliveryId = req.body.delivery_id;
-
-    if (!file || !deliveryId) {
-      res.status(400).json({ error: 'file и delivery_id обязательны' });
-      return;
-    }
-
-    const ext = path.extname(file.originalname);
-    const storagePath = `deliveries/${deliveryId}/${uuidv4()}${ext}`;
-
-    await s3Client.send(new PutObjectCommand({
-      Bucket: MAIN_BUCKET, Key: storagePath, Body: file.buffer, ContentType: file.mimetype,
-    }));
-
-    const result = await pool.query(
-      `INSERT INTO material_delivery_files (delivery_id, file_name, storage_path, file_size, mime_type, uploaded_by)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [deliveryId, file.originalname, storagePath, file.size, file.mimetype, userId]
-    );
-
-    res.status(201).json(result.rows[0]);
-  } catch (err) {
-    console.error('Upload delivery file error:', err);
     res.status(500).json({ error: 'Ошибка сервера' });
   }
 });

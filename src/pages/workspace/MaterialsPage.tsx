@@ -8,6 +8,7 @@ import DeliveryModal from "@/components/materials/DeliveryModal";
 import type { MaterialOrder } from "@/components/materials/OrderCard";
 
 type Tab = "ordered" | "remaining" | "drafts";
+type OrderFilter = "my" | "all";
 
 interface RemainingItem {
   material_name: string;
@@ -24,14 +25,16 @@ interface RemainingGroup {
 }
 
 export default function MaterialsPage() {
-  const { project } = useProject();
+  const { project, isProjectAdmin: isAdmin, isPortalAdmin } = useProject();
   const { isMobile } = useMobile();
   const [activeTab, setActiveTab] = useState<Tab>("ordered");
+  const [orderFilter, setOrderFilter] = useState<OrderFilter>("my");
 
   // Data
   const [orders, setOrders] = useState<MaterialOrder[]>([]);
   const [remaining, setRemaining] = useState<RemainingGroup[]>([]);
   const [loading, setLoading] = useState(false);
+  const canAdmin = isAdmin || isPortalAdmin;
 
   // Modals
   const [showCreate, setShowCreate] = useState(false);
@@ -42,9 +45,9 @@ export default function MaterialsPage() {
   const loadOrders = useCallback(async () => {
     if (!project) return;
     setLoading(true);
-    const res = await api.get<Record<string, unknown>[]>("/api/materials/orders", {
-      project_id: project.id,
-    });
+    const params: Record<string, string> = { project_id: project.id };
+    if (orderFilter === "my") params.my = "true";
+    const res = await api.get<Record<string, unknown>[]>("/api/materials/orders", params);
     if (res.data) {
       // Маппинг API → фронтенд типы
       const mapped: MaterialOrder[] = res.data.map((o: Record<string, unknown>) => ({
@@ -69,7 +72,7 @@ export default function MaterialsPage() {
       setOrders(mapped);
     }
     setLoading(false);
-  }, [project]);
+  }, [project, orderFilter]);
 
   const loadRemaining = useCallback(async () => {
     if (!project) return;
@@ -130,8 +133,9 @@ export default function MaterialsPage() {
     loadOrders();
   };
 
-  const handleDeleteDraft = async (order: MaterialOrder) => {
-    if (!confirm("Удалить черновик?")) return;
+  const handleDelete = async (order: MaterialOrder) => {
+    const msg = order.status === "draft" ? "Удалить черновик?" : "Удалить заказ?";
+    if (!confirm(msg)) return;
     await api.delete(`/api/materials/orders/${order.id}`);
     loadOrders();
   };
@@ -163,32 +167,58 @@ export default function MaterialsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 rounded-lg p-1 w-fit mb-4" style={{ background: "var(--ds-surface-sunken)" }}>
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className="px-4 py-2 text-sm font-medium rounded-md transition-colors flex items-center gap-1.5"
-            style={activeTab === tab.key
-              ? { background: "var(--ds-surface)", color: "var(--ds-text)", boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }
-              : { color: "var(--ds-text-faint)" }}
-          >
-            {tab.label}
-            {tab.count !== undefined && tab.count > 0 && (
-              <span
-                className="text-xs px-1.5 py-0.5 rounded-full"
-                style={{
-                  background: activeTab === tab.key
-                    ? "color-mix(in srgb, var(--ds-accent) 15%, transparent)"
-                    : "color-mix(in srgb, var(--ds-text-faint) 15%, transparent)",
-                  color: activeTab === tab.key ? "var(--ds-accent)" : "var(--ds-text-faint)",
-                }}
-              >
-                {tab.count}
-              </span>
-            )}
-          </button>
-        ))}
+      <div className="flex items-center gap-3 mb-4 flex-wrap">
+        <div className="flex gap-1 rounded-lg p-1 w-fit" style={{ background: "var(--ds-surface-sunken)" }}>
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className="px-4 py-2 text-sm font-medium rounded-md transition-colors flex items-center gap-1.5"
+              style={activeTab === tab.key
+                ? { background: "var(--ds-surface)", color: "var(--ds-text)", boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }
+                : { color: "var(--ds-text-faint)" }}
+            >
+              {tab.label}
+              {tab.count !== undefined && tab.count > 0 && (
+                <span
+                  className="text-xs px-1.5 py-0.5 rounded-full"
+                  style={{
+                    background: activeTab === tab.key
+                      ? "color-mix(in srgb, var(--ds-accent) 15%, transparent)"
+                      : "color-mix(in srgb, var(--ds-text-faint) 15%, transparent)",
+                    color: activeTab === tab.key ? "var(--ds-accent)" : "var(--ds-text-faint)",
+                  }}
+                >
+                  {tab.count}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Фильтр: Мои / Все */}
+        {(activeTab === "ordered" || activeTab === "drafts") && (
+          <div className="flex gap-1 rounded-lg p-1" style={{ background: "var(--ds-surface-sunken)" }}>
+            <button
+              onClick={() => setOrderFilter("my")}
+              className="px-3 py-1.5 text-xs font-medium rounded-md transition-colors"
+              style={orderFilter === "my"
+                ? { background: "var(--ds-surface)", color: "var(--ds-text)", boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }
+                : { color: "var(--ds-text-faint)" }}
+            >
+              Мои заказы
+            </button>
+            <button
+              onClick={() => setOrderFilter("all")}
+              className="px-3 py-1.5 text-xs font-medium rounded-md transition-colors"
+              style={orderFilter === "all"
+                ? { background: "var(--ds-surface)", color: "var(--ds-text)", boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }
+                : { color: "var(--ds-text-faint)" }}
+            >
+              Все заказы
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Content */}
@@ -201,6 +231,9 @@ export default function MaterialsPage() {
         <OrderedTab
           orders={orderedList}
           onClickOrder={setDetailOrder}
+          canAdmin={canAdmin}
+          onEdit={(o) => { setEditOrder(o); setShowCreate(true); }}
+          onDelete={handleDelete}
         />
       ) : activeTab === "remaining" ? (
         <RemainingTab groups={remaining} />
@@ -209,7 +242,7 @@ export default function MaterialsPage() {
           orders={draftList}
           onClickOrder={setDetailOrder}
           onEdit={(o) => { setEditOrder(o); setShowCreate(true); }}
-          onDelete={handleDeleteDraft}
+          onDelete={handleDelete}
           onSubmit={handleSubmitDraft}
         />
       )}
@@ -248,15 +281,18 @@ export default function MaterialsPage() {
    ============================================================================ */
 
 const STATUS_LABELS: Record<string, string> = {
-  ordered: "Заказано", partial: "Частично", delivered: "Доставлено", draft: "Черновик",
+  ordered: "Ожидают поступления", partial: "Частично", delivered: "Доставлено", draft: "Черновик",
 };
 const STATUS_COLORS: Record<string, string> = {
   ordered: "#3b82f6", partial: "#f59e0b", delivered: "#22c55e", draft: "var(--ds-text-faint)",
 };
 
-function OrderedTab({ orders, onClickOrder }: {
+function OrderedTab({ orders, onClickOrder, canAdmin, onEdit, onDelete }: {
   orders: MaterialOrder[];
   onClickOrder: (o: MaterialOrder) => void;
+  canAdmin: boolean;
+  onEdit: (o: MaterialOrder) => void;
+  onDelete: (o: MaterialOrder) => void;
 }) {
   const [showArchive, setShowArchive] = useState(false);
   const active = orders.filter((o) => o.status !== "delivered");
@@ -277,13 +313,14 @@ function OrderedTab({ orders, onClickOrder }: {
               <th>Место / Вид работ</th>
               <th>Материалы</th>
               <th className="w-24">Статус</th>
+              {canAdmin && <th className="w-20"></th>}
             </tr>
           </thead>
           <tbody>
             {active.length === 0 && !showArchive ? (
-              <tr><td colSpan={5} className="px-4 py-6 text-center" style={{ color: "var(--ds-text-faint)" }}>Нет активных заказов</td></tr>
+              <tr><td colSpan={canAdmin ? 6 : 5} className="px-4 py-6 text-center" style={{ color: "var(--ds-text-faint)" }}>Нет активных заказов</td></tr>
             ) : active.map((order) => (
-              <OrderRow key={order.id} order={order} onClick={() => onClickOrder(order)} />
+              <OrderRow key={order.id} order={order} onClick={() => onClickOrder(order)} canAdmin={canAdmin} onEdit={() => onEdit(order)} onDelete={() => onDelete(order)} />
             ))}
           </tbody>
         </table>
@@ -306,7 +343,7 @@ function OrderedTab({ orders, onClickOrder }: {
               <table className="ds-table">
                 <tbody>
                   {archived.map((order) => (
-                    <OrderRow key={order.id} order={order} onClick={() => onClickOrder(order)} />
+                    <OrderRow key={order.id} order={order} onClick={() => onClickOrder(order)} canAdmin={canAdmin} onEdit={() => onEdit(order)} onDelete={() => onDelete(order)} />
                   ))}
                 </tbody>
               </table>
@@ -318,7 +355,10 @@ function OrderedTab({ orders, onClickOrder }: {
   );
 }
 
-function OrderRow({ order, onClick }: { order: MaterialOrder; onClick: () => void }) {
+function OrderRow({ order, onClick, canAdmin, onEdit, onDelete }: {
+  order: MaterialOrder; onClick: () => void;
+  canAdmin?: boolean; onEdit?: () => void; onDelete?: () => void;
+}) {
   const location = [order.building_name, order.work_type_name].filter(Boolean).join(" / ");
   const sub = [order.floor_name, order.construction_name].filter(Boolean).join(" / ");
   const date = order.created_at ? new Date(order.created_at).toLocaleDateString("ru") : "";
@@ -355,6 +395,31 @@ function OrderRow({ order, onClick }: { order: MaterialOrder; onClick: () => voi
           {STATUS_LABELS[order.status] || order.status}
         </span>
       </td>
+      {canAdmin && (
+        <td>
+          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+            <button
+              className="ds-icon-btn p-1"
+              title="Редактировать"
+              onClick={() => onEdit?.()}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+            </button>
+            <button
+              className="ds-icon-btn p-1"
+              title="Удалить"
+              onClick={() => onDelete?.()}
+              style={{ color: "#ef4444" }}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          </div>
+        </td>
+      )}
     </tr>
   );
 }
