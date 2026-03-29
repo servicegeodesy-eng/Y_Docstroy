@@ -1,14 +1,16 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { api } from "@/lib/api";
 import { useProject } from "@/lib/ProjectContext";
 import { useMobile } from "@/lib/MobileContext";
 import OrderCard from "@/components/materials/OrderCard";
 import CreateOrderModal from "@/components/materials/CreateOrderModal";
 import DeliveryModal from "@/components/materials/DeliveryModal";
+import OrderDetailOverlay from "@/components/materials/OrderDetailOverlay";
+import MaterialFilters from "@/components/materials/MaterialFilters";
+import type { MaterialFilterKey } from "@/components/materials/MaterialFilters";
 import type { MaterialOrder } from "@/components/materials/OrderCard";
 
 type Tab = "ordered" | "remaining" | "drafts";
-type OrderFilter = "my" | "all";
 
 interface RemainingItem {
   material_name: string;
@@ -24,11 +26,15 @@ interface RemainingGroup {
   items: RemainingItem[];
 }
 
+const emptyFilters = (): Record<MaterialFilterKey, Set<string>> => ({
+  building: new Set(), workType: new Set(), floor: new Set(), construction: new Set(),
+});
+
 export default function MaterialsPage() {
   const { project, isProjectAdmin: isAdmin, isPortalAdmin } = useProject();
   const { isMobile } = useMobile();
   const [activeTab, setActiveTab] = useState<Tab>("ordered");
-  const [orderFilter, setOrderFilter] = useState<OrderFilter>("my");
+  const [showAllOrders, setShowAllOrders] = useState(false);
 
   // Data
   const [orders, setOrders] = useState<MaterialOrder[]>([]);
@@ -36,17 +42,37 @@ export default function MaterialsPage() {
   const [loading, setLoading] = useState(false);
   const canAdmin = isAdmin || isPortalAdmin;
 
+  // Filters
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState<Record<MaterialFilterKey, Set<string>>>(emptyFilters);
+  const [openFilter, setOpenFilter] = useState<MaterialFilterKey | null>(null);
+  const filterRef = useRef<HTMLDivElement>(null);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [search, setSearch] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
+
   // Modals
   const [showCreate, setShowCreate] = useState(false);
   const [editOrder, setEditOrder] = useState<MaterialOrder | null>(null);
   const [detailOrder, setDetailOrder] = useState<MaterialOrder | null>(null);
   const [deliveryOrder, setDeliveryOrder] = useState<MaterialOrder | null>(null);
 
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!openFilter) return;
+    const handler = (e: MouseEvent) => {
+      if (filterRef.current && !filterRef.current.contains(e.target as Node)) setOpenFilter(null);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [openFilter]);
+
   const loadOrders = useCallback(async () => {
     if (!project) return;
     setLoading(true);
     const params: Record<string, string> = { project_id: project.id };
-    if (orderFilter === "my") params.my = "true";
+    if (!showAllOrders) params.my = "true";
     const res = await api.get<Record<string, unknown>[]>("/api/materials/orders", params);
     if (res.data) {
       // Маппинг API → фронтенд типы
@@ -72,7 +98,7 @@ export default function MaterialsPage() {
       setOrders(mapped);
     }
     setLoading(false);
-  }, [project, orderFilter]);
+  }, [project, showAllOrders]);
 
   const loadRemaining = useCallback(async () => {
     if (!project) return;
@@ -114,12 +140,74 @@ export default function MaterialsPage() {
     }
   }, [activeTab, loadOrders, loadRemaining]);
 
+  // Filter options computed from loaded orders
+  const filterOptions = useMemo<Record<MaterialFilterKey, string[]>>(() => {
+    const sets: Record<MaterialFilterKey, Set<string>> = { building: new Set(), workType: new Set(), floor: new Set(), construction: new Set() };
+    for (const o of orders) {
+      if (o.building_name) sets.building.add(o.building_name);
+      if (o.work_type_name) sets.workType.add(o.work_type_name);
+      if (o.floor_name) sets.floor.add(o.floor_name);
+      if (o.construction_name) sets.construction.add(o.construction_name);
+    }
+    return { building: [...sets.building].sort(), workType: [...sets.workType].sort(), floor: [...sets.floor].sort(), construction: [...sets.construction].sort() };
+  }, [orders]);
+
+  const toggleFilterValue = useCallback((key: MaterialFilterKey, value: string) => {
+    setFilters((prev) => {
+      const s = new Set(prev[key]);
+      if (s.has(value)) s.delete(value); else s.add(value);
+      return { ...prev, [key]: s };
+    });
+  }, []);
+
+  const activeFilterCount = useMemo(() => {
+    let c = 0;
+    for (const k of Object.keys(filters) as MaterialFilterKey[]) c += filters[k].size;
+    if (dateFrom) c++;
+    if (dateTo) c++;
+    if (search) c++;
+    if (showAllOrders) c++;
+    return c;
+  }, [filters, dateFrom, dateTo, search, showAllOrders]);
+
+  const hasActiveFilters = activeFilterCount > 0;
+
+  const clearFilters = useCallback(() => {
+    setFilters(emptyFilters());
+    setDateFrom("");
+    setDateTo("");
+    setSearch("");
+    setShowAllOrders(false);
+  }, []);
+
+  // Client-side filtering
+  const applyFilters = useCallback((list: MaterialOrder[]) => {
+    return list.filter((o) => {
+      if (filters.building.size > 0 && !filters.building.has(o.building_name)) return false;
+      if (filters.workType.size > 0 && !filters.workType.has(o.work_type_name)) return false;
+      if (filters.floor.size > 0 && !(o.floor_name && filters.floor.has(o.floor_name))) return false;
+      if (filters.construction.size > 0 && !(o.construction_name && filters.construction.has(o.construction_name))) return false;
+      if (dateFrom && o.created_at < dateFrom) return false;
+      if (dateTo && o.created_at.slice(0, 10) > dateTo) return false;
+      if (search) {
+        const q = search.toLowerCase();
+        const haystack = [o.order_number, o.notes || ""].join(" ").toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [filters, dateFrom, dateTo, search]);
+
   if (!project) return null;
 
-  const orderedList = orders.filter((o) =>
+  const orderedListRaw = orders.filter((o) =>
     o.status === "ordered" || o.status === "partial" || o.status === "delivered"
   );
-  const draftList = orders.filter((o) => o.status === "draft");
+  const draftListRaw = orders.filter((o) => o.status === "draft");
+  const orderedList = applyFilters(orderedListRaw);
+  const draftList = applyFilters(draftListRaw);
+  const totalCount = activeTab === "drafts" ? draftListRaw.length : orderedListRaw.length;
+  const filteredCount = activeTab === "drafts" ? draftList.length : orderedList.length;
 
   const handleCreated = () => {
     setShowCreate(false);
@@ -155,9 +243,22 @@ export default function MaterialsPage() {
     <div>
       {/* Header */}
       <div className={`flex items-center justify-between ${isMobile ? "mb-3" : "mb-6"}`}>
-        <h2 className={`font-semibold ${isMobile ? "text-lg" : "text-xl"}`} style={{ color: "var(--ds-text)" }}>
-          Материалы
-        </h2>
+        <div className="flex items-center gap-2">
+          <h2 className={`font-semibold ${isMobile ? "text-lg" : "text-xl"}`} style={{ color: "var(--ds-text)" }}>
+            Материалы
+          </h2>
+          <button
+            onClick={() => setShowFilters((v) => !v)}
+            className="ds-icon-btn relative"
+            style={showFilters || hasActiveFilters ? { color: "var(--ds-accent)", background: "color-mix(in srgb, var(--ds-accent) 10%, var(--ds-surface))" } : undefined}
+            title="Фильтры"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+            </svg>
+            {hasActiveFilters && <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500" />}
+          </button>
+        </div>
         <button className="ds-btn text-sm flex items-center gap-1.5" onClick={() => setShowCreate(true)}>
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -196,30 +297,21 @@ export default function MaterialsPage() {
           ))}
         </div>
 
-        {/* Фильтр: Мои / Все */}
-        {(activeTab === "ordered" || activeTab === "drafts") && (
-          <div className="flex gap-1 rounded-lg p-1" style={{ background: "var(--ds-surface-sunken)" }}>
-            <button
-              onClick={() => setOrderFilter("my")}
-              className="px-3 py-1.5 text-xs font-medium rounded-md transition-colors"
-              style={orderFilter === "my"
-                ? { background: "var(--ds-surface)", color: "var(--ds-text)", boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }
-                : { color: "var(--ds-text-faint)" }}
-            >
-              Мои заказы
-            </button>
-            <button
-              onClick={() => setOrderFilter("all")}
-              className="px-3 py-1.5 text-xs font-medium rounded-md transition-colors"
-              style={orderFilter === "all"
-                ? { background: "var(--ds-surface)", color: "var(--ds-text)", boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }
-                : { color: "var(--ds-text-faint)" }}
-            >
-              Все заказы
-            </button>
-          </div>
-        )}
       </div>
+
+      {/* Фильтры */}
+      {showFilters && (activeTab === "ordered" || activeTab === "drafts") && (
+        <MaterialFilters
+          filters={filters} setFilters={setFilters} filterOptions={filterOptions}
+          openFilter={openFilter} setOpenFilter={setOpenFilter} filterRef={filterRef}
+          dateFrom={dateFrom} setDateFrom={setDateFrom} dateTo={dateTo} setDateTo={setDateTo}
+          search={search} setSearch={setSearch} showSearch={showSearch} setShowSearch={setShowSearch}
+          hasActiveFilters={hasActiveFilters} activeFilterCount={activeFilterCount}
+          filteredCount={filteredCount} totalCount={totalCount}
+          clearFilters={clearFilters} toggleFilterValue={toggleFilterValue}
+          allOrders={showAllOrders} setAllOrders={setShowAllOrders} showAllToggle
+        />
+      )}
 
       {/* Content */}
       {loading ? (
@@ -276,16 +368,9 @@ export default function MaterialsPage() {
   );
 }
 
-/* ============================================================================
-   Tab: Заказано
-   ============================================================================ */
-
-const STATUS_LABELS: Record<string, string> = {
-  ordered: "Ожидают поступления", partial: "Частично", delivered: "Доставлено", draft: "Черновик",
-};
-const STATUS_COLORS: Record<string, string> = {
-  ordered: "#3b82f6", partial: "#f59e0b", delivered: "#22c55e", draft: "var(--ds-text-faint)",
-};
+/* === Sub-components === */
+const STATUS_LABELS: Record<string, string> = { ordered: "Ожидают поступления", partial: "Частично", delivered: "Доставлено", draft: "Черновик" };
+const STATUS_COLORS: Record<string, string> = { ordered: "#3b82f6", partial: "#f59e0b", delivered: "#22c55e", draft: "var(--ds-text-faint)" };
 
 function OrderedTab({ orders, onClickOrder, canAdmin, onEdit, onDelete }: {
   orders: MaterialOrder[];
@@ -424,10 +509,6 @@ function OrderRow({ order, onClick, canAdmin, onEdit, onDelete }: {
   );
 }
 
-/* ============================================================================
-   Tab: Остатки
-   ============================================================================ */
-
 function RemainingTab({ groups }: { groups: RemainingGroup[] }) {
   const { isMobile } = useMobile();
 
@@ -468,10 +549,6 @@ function RemainingTab({ groups }: { groups: RemainingGroup[] }) {
   );
 }
 
-/* ============================================================================
-   Tab: Черновики
-   ============================================================================ */
-
 function DraftsTab({ orders, onClickOrder, onEdit, onDelete, onSubmit }: {
   orders: MaterialOrder[];
   onClickOrder: (o: MaterialOrder) => void;
@@ -501,125 +578,6 @@ function DraftsTab({ orders, onClickOrder, onEdit, onDelete, onSubmit }: {
     </div>
   );
 }
-
-/* ============================================================================
-   Order Detail Overlay
-   ============================================================================ */
-
-function OrderDetailOverlay({ order, onClose, onDelivery, isMobile }: {
-  order: MaterialOrder;
-  onClose: () => void;
-  onDelivery: () => void;
-  isMobile: boolean;
-}) {
-  const locationParts = [
-    order.building_name,
-    order.work_type_name,
-    order.floor_name,
-    order.construction_name,
-  ].filter(Boolean);
-
-  const canDeliver = order.status === "ordered" || order.status === "partial";
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.5)" }}>
-      <div
-        className="w-full rounded-xl shadow-xl overflow-hidden flex flex-col"
-        style={{
-          maxWidth: isMobile ? "100%" : "560px",
-          maxHeight: "90vh",
-          background: "var(--ds-surface)",
-        }}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "var(--ds-border)" }}>
-          <h3 className="font-semibold text-base" style={{ color: "var(--ds-text)" }}>
-            Заказ #{order.order_number}
-          </h3>
-          <button className="ds-icon-btn" onClick={onClose}>
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-          {/* Location */}
-          <div>
-            <p className="text-xs font-medium mb-1" style={{ color: "var(--ds-text-muted)" }}>Место</p>
-            <p className="text-sm" style={{ color: "var(--ds-text)" }}>{locationParts.join(" / ")}</p>
-          </div>
-
-          {/* Date and author */}
-          <div className="flex gap-6">
-            <div>
-              <p className="text-xs font-medium mb-1" style={{ color: "var(--ds-text-muted)" }}>Дата</p>
-              <p className="text-sm" style={{ color: "var(--ds-text)" }}>
-                {new Date(order.created_at).toLocaleDateString("ru-RU")}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs font-medium mb-1" style={{ color: "var(--ds-text-muted)" }}>Автор</p>
-              <p className="text-sm" style={{ color: "var(--ds-text)" }}>{order.created_by_name}</p>
-            </div>
-          </div>
-
-          {/* Items */}
-          <div>
-            <p className="text-xs font-medium mb-2" style={{ color: "var(--ds-text-muted)" }}>Позиции</p>
-            <div className="space-y-3">
-              {order.items.map((item) => {
-                const pct = item.quantity > 0 ? Math.min((item.delivered_quantity / item.quantity) * 100, 100) : 0;
-                const barColor = pct >= 100 ? "#22c55e" : pct > 0 ? "#f59e0b" : "#3b82f6";
-                return (
-                  <div key={item.id} className="p-3 rounded-lg" style={{ background: "var(--ds-surface-sunken)" }}>
-                    <div className="flex justify-between mb-1">
-                      <span className="text-sm font-medium" style={{ color: "var(--ds-text)" }}>{item.material_name}</span>
-                      <span className="text-xs" style={{ color: "var(--ds-text-muted)" }}>{item.unit_name}</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "var(--ds-border)" }}>
-                        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: barColor }} />
-                      </div>
-                      <span className="text-xs font-medium whitespace-nowrap" style={{ color: "var(--ds-text)" }}>
-                        {item.delivered_quantity} / {item.quantity}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Notes */}
-          {order.notes && (
-            <div>
-              <p className="text-xs font-medium mb-1" style={{ color: "var(--ds-text-muted)" }}>Примечание</p>
-              <p className="text-sm" style={{ color: "var(--ds-text)" }}>{order.notes}</p>
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t" style={{ borderColor: "var(--ds-border)" }}>
-          <button className="ds-btn-secondary text-sm px-4 py-2" onClick={onClose}>
-            Закрыть
-          </button>
-          {canDeliver && (
-            <button className="ds-btn text-sm px-4 py-2" onClick={onDelivery}>
-              Зафиксировать поступление
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ============================================================================
-   Shared Empty State
-   ============================================================================ */
 
 function EmptyState({ message, hint }: { message: string; hint: string }) {
   return (
