@@ -247,6 +247,34 @@ router.post('/fileshare', upload.single('file'), async (req: AuthRequest, res: R
   }
 });
 
+// POST /api/files/upload — generic S3 upload (для uploadRawFile: remarks, gro, supervision и т.д.)
+router.post('/upload', upload.single('file'), async (req: AuthRequest, res: Response) => {
+  try {
+    const file = req.file;
+    const bucketKey = req.body.bucket as string;
+    const storagePath = req.body.path as string;
+
+    if (!file || !storagePath) {
+      res.status(400).json({ error: 'file и path обязательны' });
+      return;
+    }
+
+    const bucket = storagePath.includes('/projects/') ? MAIN_BUCKET : getBucketName(bucketKey || 'cell-files');
+
+    await s3Client.send(new PutObjectCommand({
+      Bucket: bucket,
+      Key: storagePath,
+      Body: file.buffer,
+      ContentType: file.mimetype,
+    }));
+
+    res.status(201).json({ storage_path: storagePath });
+  } catch (err) {
+    console.error('Generic upload error:', err);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
 // GET /api/files/download?bucket=...&path=...
 router.get('/download', async (req: AuthRequest, res: Response) => {
   try {

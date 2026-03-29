@@ -18,17 +18,19 @@ const EMPTY: BadgeCounts = { registry: 0, requests: 0, fileshare: 0, notificatio
  * и обновления при каждом NOTIFY из PostgreSQL.
  * Fallback: поллинг /api/badges/counts каждые 60 сек если SSE недоступен.
  */
-export function useBadgeCounts(): BadgeCounts & { refresh: () => void } {
+export function useBadgeCounts(projectId?: string): BadgeCounts & { refresh: () => void } {
   const [counts, setCounts] = useState<BadgeCounts>(EMPTY);
   const eventSourceRef = useRef<EventSource | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const qs = projectId ? `?projectId=${projectId}` : "";
 
   // Fallback: одноразовый fetch counts
   const fetchCounts = useCallback(async () => {
     const token = getToken();
     if (!token) return;
     try {
-      const res = await fetch(`${API_URL}/api/badges/counts`, {
+      const res = await fetch(`${API_URL}/api/badges/counts${qs}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -36,7 +38,7 @@ export function useBadgeCounts(): BadgeCounts & { refresh: () => void } {
         setCounts(data);
       }
     } catch { /* ignore */ }
-  }, []);
+  }, [qs]);
 
   useEffect(() => {
     const token = getToken();
@@ -60,7 +62,7 @@ export function useBadgeCounts(): BadgeCounts & { refresh: () => void } {
 
     async function connectSSE() {
       try {
-        const response = await fetch(`${API_URL}/api/badges/stream`, {
+        const response = await fetch(`${API_URL}/api/badges/stream${qs}`, {
           headers: { Authorization: `Bearer ${token}` },
           signal: abortController.signal,
         });

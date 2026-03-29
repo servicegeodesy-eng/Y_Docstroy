@@ -25,7 +25,7 @@ function WorkspaceContent() {
 
   const geo = isGeoMode();
   const canSeeTasks = geo ? false : hasPermission("can_view_tasks");
-  const badges = useBadgeCounts();
+  const badges = useBadgeCounts(projectId);
 
   // Когда count уведомлений растёт — показываем кружок на задачах
   const handleNotifCountChange = useCallback((count: number) => {

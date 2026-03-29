@@ -1,3 +1,4 @@
+import React from "react";
 import { shortName, getExt, formatDate, downloadStorage, isPreviewable } from "@/lib/utils";
 import DropdownPortal from "@/components/ui/DropdownPortal";
 import { getStatusStyle } from "@/constants/statusColors";
@@ -20,6 +21,7 @@ interface Props {
   hasPermission: (p: PermissionKey) => boolean;
   isProjectAdmin: boolean;
   userId: string | undefined;
+  actionRequiredCount?: number;
   formatDropdown: { cellId: string; ext: string } | null;
   setFormatDropdown: (v: { cellId: string; ext: string } | null) => void;
   dropdownRef: React.RefObject<HTMLDivElement>;
@@ -53,7 +55,7 @@ function getStatusUser(cell: CellRow): string {
 export default function RegistryDesktopTable({
   cells, loading, loadError, sorted, paginatedRows,
   sortColumn, sortDir, onSort, getColorKey,
-  hasPermission, isProjectAdmin, userId,
+  hasPermission, isProjectAdmin, userId, actionRequiredCount = 0,
   formatDropdown, setFormatDropdown, dropdownRef, formatBtnRef,
   setPreviewFile,
   onDetailOpen, onSendCell, onAcknowledgeCell, onSupervisionCell,
@@ -131,9 +133,17 @@ export default function RegistryDesktopTable({
               </td>
             </tr>
           ) : (
-            paginatedRows.map((cell) => (
+            paginatedRows.map((cell, idx) => (
+              <React.Fragment key={cell.id}>
+              {/* Разделитель между ячейками, требующими действия, и остальными */}
+              {actionRequiredCount > 0 && idx === actionRequiredCount && (
+                <tr>
+                  <td colSpan={100} className="px-0 py-0">
+                    <div style={{ borderTop: "2px solid var(--ds-accent)", opacity: 0.3 }} />
+                  </td>
+                </tr>
+              )}
               <tr
-                key={cell.id}
                 className="cursor-pointer"
                 onDoubleClick={() => onDetailOpen(cell.id)}
               >
@@ -378,6 +388,7 @@ export default function RegistryDesktopTable({
                   </div>
                 </td>
               </tr>
+              </React.Fragment>
             ))
           )}
         </tbody>

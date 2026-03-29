@@ -1,3 +1,4 @@
+import React from "react";
 import { formatDate } from "@/lib/utils";
 import { getStatusStyle } from "@/constants/statusColors";
 import type { CellRow } from "@/hooks/useRegistryCells";
@@ -13,6 +14,7 @@ interface Props {
   hasPermission: (p: PermissionKey) => boolean;
   isProjectAdmin: boolean;
   userId: string | undefined;
+  actionRequiredCount?: number;
   onDetailOpen: (id: string) => void;
   onSendCell: (c: { id: string; name: string }) => void;
   onAcknowledgeCell: (c: { id: string; name: string }) => void;
@@ -25,7 +27,7 @@ interface Props {
 
 export default function RegistryMobileView({
   cells, loading, loadError, sorted, paginatedRows, getColorKey,
-  hasPermission, isProjectAdmin, userId,
+  hasPermission, isProjectAdmin, userId, actionRequiredCount = 0,
   onDetailOpen, onSendCell, onAcknowledgeCell, onSupervisionCell,
   onRemarksCell, onDelegateCell, onSign, onDownloadAll,
 }: Props) {
@@ -52,9 +54,12 @@ export default function RegistryMobileView({
 
   return (
     <>
-      {paginatedRows.map((cell) => (
+      {paginatedRows.map((cell, idx) => (
+        <React.Fragment key={cell.id}>
+        {actionRequiredCount > 0 && idx === actionRequiredCount && (
+          <div style={{ borderTop: "2px solid var(--ds-accent)", opacity: 0.3, margin: "8px 0" }} />
+        )}
         <div
-          key={cell.id}
           className="ds-card p-3 cursor-pointer"
           onClick={() => onDetailOpen(cell.id)}
         >
@@ -187,6 +192,7 @@ export default function RegistryMobileView({
             )}
           </div>
         </div>
+        </React.Fragment>
       ))}
     </>
   );

@@ -107,12 +107,14 @@ export default function RegistryPage() {
     if (hasActiveFilters && dataScope === 'initial') loadCells('filtered');
   }, [hasActiveFilters, dataScope, loadCells]);
 
+  const userId = user?.id;
+
   const sorted = useMemo(() => {
     const arr = [...filtered];
     const dir = sortDir === "asc" ? 1 : -1;
     const str = (a: string | null | undefined, b: string | null | undefined) =>
       (a || "").localeCompare(b || "", "ru") * dir;
-    arr.sort((a, b) => {
+    const compare = (a: CellRow, b: CellRow) => {
       switch (sortColumn) {
         case "date": return (new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) * dir;
         case "name": return str(a.name, b.name);
@@ -129,12 +131,23 @@ export default function RegistryPage() {
         case "status": return str(a.status, b.status);
         default: return 0;
       }
-    });
-    return arr;
-  }, [filtered, sortColumn, sortDir]);
+    };
+    // Разделяем: ячейки, требующие действия — наверху
+    const actionRequired = arr.filter(c => c.assigned_to === userId && c.send_type);
+    const rest = arr.filter(c => !(c.assigned_to === userId && c.send_type));
+    actionRequired.sort(compare);
+    rest.sort(compare);
+    return [...actionRequired, ...rest];
+  }, [filtered, sortColumn, sortDir, userId]);
 
   // Сброс страницы при изменении фильтров/сортировки
   useEffect(() => { setPage(1); }, [filters, dateFrom, dateTo, search, sortColumn, sortDir]);
+
+  // Количество ячеек, требующих действия (для разделителя в таблице)
+  const actionRequiredCount = useMemo(
+    () => sorted.filter(c => c.assigned_to === userId && c.send_type).length,
+    [sorted, userId]
+  );
 
   const paginatedRows = usePagination(sorted, page, pageSize);
 
@@ -261,6 +274,7 @@ export default function RegistryPage() {
             cells={cells} loading={loading} loadError={loadError}
             sorted={sorted} paginatedRows={paginatedRows} getColorKey={getColorKey}
             hasPermission={hasPermission} isProjectAdmin={isProjectAdmin} userId={user?.id}
+            actionRequiredCount={actionRequiredCount}
             onDetailOpen={modals.setDetailCellId}
             onSendCell={modals.setSendCell}
             onAcknowledgeCell={modals.setAcknowledgeCell}
@@ -280,6 +294,7 @@ export default function RegistryPage() {
           sorted={sorted} paginatedRows={paginatedRows}
           sortColumn={sortColumn} sortDir={sortDir} onSort={handleSort} getColorKey={getColorKey}
           hasPermission={hasPermission} isProjectAdmin={isProjectAdmin} userId={user?.id}
+          actionRequiredCount={actionRequiredCount}
           formatDropdown={formatDropdown} setFormatDropdown={setFormatDropdown}
           dropdownRef={dropdownRef} formatBtnRef={formatBtnRef}
           previewFile={previewFile} setPreviewFile={setPreviewFile}

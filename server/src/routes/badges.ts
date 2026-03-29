@@ -66,9 +66,10 @@ function scheduleReconnect() {
   }, 5000);
 }
 
-// GET /api/badges/stream — SSE endpoint
+// GET /api/badges/stream?projectId=... — SSE endpoint
 router.get('/stream', async (req: AuthRequest, res: Response) => {
   const userId = req.userId!;
+  const projectId = req.query.projectId as string | undefined;
 
   // SSE headers
   res.writeHead(200, {
@@ -87,7 +88,7 @@ router.get('/stream', async (req: AuthRequest, res: Response) => {
 
   // Сразу отправляем текущие counts
   try {
-    const counts = await getBadgeCounts(userId);
+    const counts = await getBadgeCounts(userId, projectId);
     res.write(`data: ${JSON.stringify(counts)}\n\n`);
   } catch { /* ignore */ }
 
@@ -112,10 +113,11 @@ router.get('/stream', async (req: AuthRequest, res: Response) => {
   });
 });
 
-// GET /api/badges/counts — одноразовый запрос counts (fallback)
+// GET /api/badges/counts?projectId=... — одноразовый запрос counts (fallback)
 router.get('/counts', async (req: AuthRequest, res: Response) => {
   try {
-    const counts = await getBadgeCounts(req.userId!);
+    const projectId = req.query.projectId as string | undefined;
+    const counts = await getBadgeCounts(req.userId!, projectId);
     res.json(counts);
   } catch (err) {
     console.error('Badge counts error:', err);
@@ -127,13 +129,18 @@ router.get('/counts', async (req: AuthRequest, res: Response) => {
 // Подсчёт бейджей — 3 лёгких COUNT-запроса
 // ============================================================================
 
-async function getBadgeCounts(userId: string) {
-  // Получаем проекты пользователя
-  const projectsRes = await pool.query(
-    'SELECT project_id FROM project_members WHERE user_id = $1',
-    [userId]
-  );
-  const projectIds = projectsRes.rows.map((r: { project_id: string }) => r.project_id);
+async function getBadgeCounts(userId: string, projectId?: string) {
+  // Если передан projectId — считаем только для него, иначе по всем проектам
+  let projectIds: string[];
+  if (projectId) {
+    projectIds = [projectId];
+  } else {
+    const projectsRes = await pool.query(
+      'SELECT project_id FROM project_members WHERE user_id = $1',
+      [userId]
+    );
+    projectIds = projectsRes.rows.map((r: { project_id: string }) => r.project_id);
+  }
 
   if (projectIds.length === 0) {
     return { registry: 0, requests: 0, fileshare: 0, notifications: 0 };
