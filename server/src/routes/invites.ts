@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import pool from '../config/db';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { isPortalAdmin, isProjectAdmin } from '../middleware/permissions';
+import { checkUserLimit } from '../middleware/subscription';
 
 const router = Router();
 router.use(authMiddleware);
@@ -160,6 +161,13 @@ router.post('/accept/:code', async (req: AuthRequest, res: Response) => {
       return;
     }
 
+    // Проверка лимита пользователей
+    const userCheck = await checkUserLimit(invite.company_id);
+    if (!userCheck.allowed) {
+      res.status(403).json({ error: `Лимит пользователей исчерпан (${userCheck.current}/${userCheck.max})` });
+      return;
+    }
+
     // Добавляем в компанию
     await pool.query(
       `INSERT INTO company_members (company_id, user_id, role)
@@ -237,6 +245,15 @@ router.post('/register-and-accept/:code', async (req, res) => {
       [email, password_hash, last_name, first_name, middle_name || null, display_name]
     );
     const userId = userResult.rows[0].id;
+
+    // Проверка лимита пользователей
+    const userCheck = await checkUserLimit(invite.company_id);
+    if (!userCheck.allowed) {
+      // Откатываем создание пользователя
+      await pool.query('DELETE FROM users WHERE id = $1', [userId]);
+      res.status(403).json({ error: `Лимит пользователей исчерпан (${userCheck.current}/${userCheck.max})` });
+      return;
+    }
 
     // Добавляем в компанию
     await pool.query(
