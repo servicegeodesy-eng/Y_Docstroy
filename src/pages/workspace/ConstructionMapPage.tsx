@@ -172,7 +172,7 @@ export default function ConstructionMapPage() {
 
   // LEFT column labels (above ground): Кровля, Фасад, Каркас, Стены
   const lcX = VL + 4;
-  const aboveY = { roof: VT + 6, facade: VT + 38, frame: VT + 70, walls: VT + 102 };
+  const aboveY = { roof: VT + 6, facade: VT + 38, walls: VT + 70, frame: VT + 102 };
 
   // LEFT column labels (below ground): Основание, Ограждение, Сваи — SAME position
   const belowY = { foundation: GL + 10, pit: GL + 46, piles: GL + 92 };
