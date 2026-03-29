@@ -232,12 +232,12 @@ export default function ConstructionMapPage() {
   const ShoringLeft = BX - 16;
   const ShoringRight = FX + FW + 16;
   const ShoringTop = GL + 6; // starts just below ground
-  const ShoringBottom = GL + 130; // goes deep
   const FoundH = 22; // foundation height (inside shoring)
-  const PitTop = GL + 6 + FoundH; // pit starts below foundation
-  const PitBottom = ShoringBottom; // pit ends at shoring bottom
-  // Piles — below shoring
-  const PileDepth = 70;
+  const PitH = 28; // narrow pit space below foundation
+  const ShoringBottom = ShoringTop + FoundH + PitH; // shoring ends at pit bottom
+  const PitTop = ShoringTop + FoundH; // pit starts below foundation
+  // Piles — from foundation bottom, through pit, deep into earth
+  const PileLen = 130; // total pile length
   // Earthwork — on surface, left side
   const PileX = 140, PileW = 120, PileH = 46;
   // Landscaping — right of building
@@ -383,15 +383,15 @@ export default function ConstructionMapPage() {
           {/* Right shoring wall — full depth */}
           <rect x={ShoringRight - SheetW} y={ShoringTop} width={SheetW} height={ShoringBottom - ShoringTop}
             fill={p("pat-sheet", "pat-sheet-dk")} stroke={dk ? "#5a7a90" : "#5a7a9a"} strokeWidth="1.5" />
-          {/* Pit space inside shoring (between walls, below foundation) */}
+          {/* Pit space inside shoring (narrow strip between foundation and shoring bottom) */}
           <rect
             x={ShoringLeft + SheetW} y={PitTop}
-            width={ShoringRight - ShoringLeft - SheetW * 2} height={PitBottom - PitTop}
+            width={ShoringRight - ShoringLeft - SheetW * 2} height={PitH}
             fill={dk ? "#141e2e" : "#e4dcd0"} stroke={dk ? "#3a4a5a" : "#a09888"} strokeWidth="0.5"
           />
           {/* Label right side */}
-          <FramedLabel x={ShoringRight + 30} y={ShoringTop + 30} text="Ограждение" text2="котлована" dk={dk} id="pit" hovered={hovered}
-            lineFromX={ShoringRight} lineFromY={(ShoringTop + ShoringBottom) / 2} />
+          <FramedLabel x={ShoringRight + 30} y={ShoringTop + 8} text="Ограждение" text2="котлована" dk={dk} id="pit" hovered={hovered}
+            lineFromX={ShoringRight} lineFromY={ShoringTop + (ShoringBottom - ShoringTop) / 2} />
         </g>
 
         {/* ====== FOUNDATION (inside shoring, at top) ====== */}
@@ -399,16 +399,16 @@ export default function ConstructionMapPage() {
           <rect x={ShoringLeft + SheetW} y={ShoringTop} width={ShoringRight - ShoringLeft - SheetW * 2} height={FoundH}
             fill={p("pat-concrete", "pat-concrete-dk")} stroke={dk ? "#5a7a90" : "#7a8a9a"} strokeWidth="1.5" />
           {/* Label right side, below shoring label */}
-          <FramedLabel x={ShoringRight + 30} y={ShoringTop + 80} text="Основание" dk={dk} id="foundation" hovered={hovered}
+          <FramedLabel x={ShoringRight + 30} y={ShoringTop + 56} text="Основание" dk={dk} id="foundation" hovered={hovered}
             lineFromX={ShoringRight - SheetW - 20} lineFromY={ShoringTop + FoundH / 2} />
         </g>
 
-        {/* ====== PILES (сваи) — below shoring ====== */}
+        {/* ====== PILES (сваи) — from foundation bottom, through pit, deep into earth ====== */}
         <g {...zoneProps("piles")}>
           {Array.from({ length: 7 }, (_, i) => {
             const px = ShoringLeft + SheetW + 20 + i * ((ShoringRight - ShoringLeft - SheetW * 2 - 40) / 6);
-            const pTop = ShoringBottom;
-            const pLen = PileDepth + (i % 2) * 12;
+            const pTop = PitTop; // start at foundation bottom
+            const pLen = PileLen + (i % 2) * 14;
             return (
               <g key={`pile-${i}`}>
                 <rect x={px - 4} y={pTop} width="8" height={pLen} fill={p("pat-concrete", "pat-concrete-dk")} stroke={dk ? "#5a7a90" : "#7a8a9a"} strokeWidth="1" />
@@ -417,9 +417,9 @@ export default function ConstructionMapPage() {
               </g>
             );
           })}
-          {/* Label right side, below foundation label */}
-          <FramedLabel x={ShoringRight + 30} y={ShoringBottom + 20} text="Сваи" dk={dk} id="piles" hovered={hovered}
-            lineFromX={ShoringRight - SheetW - 30} lineFromY={ShoringBottom + PileDepth / 2} />
+          {/* Label right side */}
+          <FramedLabel x={ShoringRight + 30} y={ShoringTop + 90} text="Сваи" dk={dk} id="piles" hovered={hovered}
+            lineFromX={ShoringRight - SheetW - 30} lineFromY={PitTop + PileLen / 2} />
         </g>
       </svg>
     </div>
