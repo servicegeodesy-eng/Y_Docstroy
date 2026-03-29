@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useTheme } from "../../lib/ThemeContext";
 
 interface Zone { id: string; label: string; path: string }
 
@@ -134,7 +135,8 @@ export default function ConstructionMapPage() {
     onClick: () => handleClick(id), role: "button" as const, tabIndex: 0,
     onKeyDown: (e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleClick(id); } },
   });
-  const dk = typeof document !== "undefined" && document.documentElement.classList.contains("dark");
+  const { theme } = useTheme();
+  const dk = theme === "dark";
   const p = (l: string, d: string) => `url(#${dk ? d : l})`;
 
   /* ---- MIRRORED Layout: Frame LEFT, Facade RIGHT ---- */
