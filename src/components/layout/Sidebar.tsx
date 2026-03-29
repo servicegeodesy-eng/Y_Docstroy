@@ -222,7 +222,11 @@ export default function Sidebar({ isAdmin, mobileMode, onNavigate, badges }: Sid
   const navigate = useNavigate();
   const canViewRequests = hasPermission("can_view_requests");
   const geo = isGeoMode();
-  const isWorkProducer = userRole === "Производитель работ";
+  const isNativeWorkProducer = userRole === "Производитель работ";
+  // Админы могут переключать РМ
+  const canSwitchWorkspace = isAdmin || isPortalAdmin;
+  const [workspaceMode, setWorkspaceMode] = useState<"geodesy" | "production">(isNativeWorkProducer ? "production" : "geodesy");
+  const isWorkProducer = canSwitchWorkspace ? workspaceMode === "production" : isNativeWorkProducer;
   const [collapsed, setCollapsed] = useState(() => !mobileMode && localStorage.getItem(STORAGE_KEY) === "1");
   const [copied, setCopied] = useState(false);
 
@@ -326,6 +330,43 @@ export default function Sidebar({ isAdmin, mobileMode, onNavigate, badges }: Sid
       )}
 
       <nav className="flex-1 py-3 space-y-1 overflow-y-auto">
+        {/* Переключатель РМ для админов */}
+        {!geo && canSwitchWorkspace && !isCollapsed && (
+          <div className="px-2 pb-2 mb-1" style={{ borderBottom: "1px solid var(--ds-sidebar-border)" }}>
+            <div className="flex rounded-lg p-0.5" style={{ background: "rgba(255,255,255,0.08)" }}>
+              <button
+                onClick={() => setWorkspaceMode("geodesy")}
+                className="flex-1 px-2 py-1 text-xs font-medium rounded-md transition-colors"
+                style={workspaceMode === "geodesy"
+                  ? { background: "rgba(255,255,255,0.15)", color: "#fff" }
+                  : { color: "rgba(255,255,255,0.5)" }}
+              >
+                Геодезия
+              </button>
+              <button
+                onClick={() => setWorkspaceMode("production")}
+                className="flex-1 px-2 py-1 text-xs font-medium rounded-md transition-colors"
+                style={workspaceMode === "production"
+                  ? { background: "rgba(255,255,255,0.15)", color: "#fff" }
+                  : { color: "rgba(255,255,255,0.5)" }}
+              >
+                Производство
+              </button>
+            </div>
+          </div>
+        )}
+        {!geo && canSwitchWorkspace && isCollapsed && (
+          <button
+            onClick={() => setWorkspaceMode(workspaceMode === "geodesy" ? "production" : "geodesy")}
+            className="ds-nav-link justify-center mb-1"
+            title={workspaceMode === "geodesy" ? "Переключить на Производство" : "Переключить на Геодезию"}
+          >
+            <span className="text-[10px] font-bold" style={{ color: "rgba(255,255,255,0.7)" }}>
+              {workspaceMode === "geodesy" ? "ГЕО" : "ПР"}
+            </span>
+          </button>
+        )}
+
         {/* ═══ РМ Производителя работ (Прораба) ═══ */}
         {!geo && isWorkProducer && (
           <>

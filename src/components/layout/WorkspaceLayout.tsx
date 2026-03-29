@@ -21,27 +21,11 @@ function WorkspaceContent() {
   const location = useLocation();
   const { projectId } = useParams();
   const [profile, setProfile] = useState<ProfileShort | null>(null);
-  const [hasNewTasks, setHasNewTasks] = useState(false);
-  const prevNotifCount = useRef<number | null>(null);
 
   const geo = isGeoMode();
-  const canSeeTasks = geo ? false : hasPermission("can_view_tasks");
   const badges = useBadgeCounts(projectId);
 
-  // Когда count уведомлений растёт — показываем кружок на задачах
-  const handleNotifCountChange = useCallback((count: number) => {
-    if (prevNotifCount.current !== null && count > prevNotifCount.current) {
-      setHasNewTasks(true);
-    }
-    prevNotifCount.current = count;
-  }, []);
-
-  // Когда пользователь на странице задач — гасим кружок
-  useEffect(() => {
-    if (location.pathname.endsWith("/tasks")) {
-      setHasNewTasks(false);
-    }
-  }, [location.pathname]);
+  const handleNotifCountChange = useCallback((_count: number) => {}, []);
 
   useEffect(() => {
     if (!user) return;
@@ -243,23 +227,8 @@ function WorkspaceContent() {
                 </button>
                 <ProjectSwitcher currentName={project.name} description={project.description} compact />
               </div>
-              {/* Строка 2: задачи + иконки */}
-              <div className="flex items-center justify-between w-full -mt-1">
-                <div className="flex items-center gap-1">
-                  {canSeeTasks && (
-                    <button
-                      onClick={() => navigate(`/projects/${projectId}/tasks`)}
-                      className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                        location.pathname.endsWith("/tasks") ? "bg-[var(--ds-accent)] text-white" : "hover:bg-[var(--ds-surface-elevated)]"
-                      }`}
-                      style={!location.pathname.endsWith("/tasks") ? { color: "var(--ds-text)" } : undefined}
-                    >
-                      <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
-                      <span>Задачи</span>
-                      {hasNewTasks && <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />}
-                    </button>
-                  )}
-                </div>
+              {/* Строка 2: иконки */}
+              <div className="flex items-center justify-end w-full -mt-1">
                 <div className="flex items-center gap-1">
                   <NotificationBell onCountChange={handleNotifCountChange} />
                   <button onClick={toggleMode} className="ds-icon-btn" title="Десктоп-версия">
@@ -276,22 +245,6 @@ function WorkspaceContent() {
             <>
               <div className="flex items-center gap-2 min-w-0">
                 <ProjectSwitcher currentName={project.name} description={project.description} />
-              </div>
-
-              <div className="flex items-center gap-2">
-                {canSeeTasks && (
-                  <button
-                    onClick={() => navigate(`/projects/${projectId}/tasks`)}
-                    className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                      location.pathname.endsWith("/tasks") ? "bg-[var(--ds-accent)] text-white" : "hover:bg-[var(--ds-surface-elevated)]"
-                    }`}
-                    style={!location.pathname.endsWith("/tasks") ? { color: "var(--ds-text)" } : undefined}
-                  >
-                    <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
-                    <span>Задачи</span>
-                    {hasNewTasks && <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />}
-                  </button>
-                )}
               </div>
 
               <div className="flex items-center gap-2 shrink-0">

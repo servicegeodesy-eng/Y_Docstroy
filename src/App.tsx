@@ -8,7 +8,6 @@ import ForcePasswordChangeModal from "./components/ForcePasswordChangeModal";
 const AuthPage = lazy(() => import("./pages/AuthPage"));
 const ProjectsPage = lazy(() => import("./pages/ProjectsPage"));
 const WorkspaceLayout = lazy(() => import("./components/layout/WorkspaceLayout"));
-const TasksPage = lazy(() => import("./pages/workspace/TasksPage"));
 const RegistryPage = lazy(() => import("./pages/workspace/RegistryPage"));
 const ChessboardReport = lazy(() => import("./pages/workspace/ChessboardReport"));
 const ExplorerPage = lazy(() => import("./pages/workspace/ExplorerPage"));
@@ -107,7 +106,7 @@ export default function App() {
           }
         >
           <Route index element={<Navigate to={geo ? "requests" : "registry"} replace />} />
-          {!geo && <Route path="tasks" element={<TasksPage />} />}
+
           {!geo && <Route path="registry" element={<RegistryPage />} />}
           {!geo && <Route path="construction" element={<ConstructionMapPage />} />}
           {!geo && <Route path="plan" element={<PlanPage mode="plan" />} />}
