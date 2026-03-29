@@ -210,12 +210,12 @@ export default function WorkDetailModal({ workId, onClose, onUpdated }: Props) {
                             className="ds-btn w-full text-sm py-2 mb-2">Зафиксировать процесс</button>
 
                           {/* Фиксация поступления */}
-                          {mat.order_item_id && (
+                          {(
                             showDelivery === mat.id ? (
                               <div className="flex items-center gap-2">
                                 <input className="ds-input flex-1 text-sm text-center" type="number" min="0" placeholder="Количество поступления"
-                                  value={deliveryAmounts[mat.order_item_id] || ""} onChange={e => setDeliveryAmounts(p => ({ ...p, [mat.order_item_id!]: e.target.value }))} />
-                                <button onClick={() => handleDelivery(mat.order_item_id!)} disabled={actionLoading} className="ds-btn text-xs px-3 py-1.5">OK</button>
+                                  value={deliveryAmounts[mat.order_item_id || mat.id] || ""} onChange={e => setDeliveryAmounts(p => ({ ...p, [mat.order_item_id || mat.id]: e.target.value }))} />
+                                <button onClick={() => handleDelivery(mat.order_item_id || mat.id)} disabled={actionLoading} className="ds-btn text-xs px-3 py-1.5">OK</button>
                                 <button onClick={() => setShowDelivery(null)} className="ds-icon-btn">
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
