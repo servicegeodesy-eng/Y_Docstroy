@@ -231,7 +231,7 @@ export default function ConstructionMapPage() {
             <rect key={`cl-${i}`} x={cx - 5} y={FY} width="10" height={FH} fill={p("pat-concrete", "pat-concrete-dk")} stroke={dk ? "#5a7a90" : "#7a8a9a"} strokeWidth="0.8" />
           ))}
           <FramedLabel x={lcX} y={aboveY.frame} text="Каркас" dk={dk} id="frame" hovered={hovered}
-            lineFromX={FX + FW / 2} lineFromY={FY + 30} />
+            lineFromX={FX + FW * 0.4} lineFromY={FY + FH * 0.7} />
         </g>
 
         {/* WALLS — brick infill in frame */}
@@ -245,7 +245,7 @@ export default function ConstructionMapPage() {
             );
           }))}
           <FramedLabel x={lcX} y={aboveY.walls} text="Стены" dk={dk} id="walls" hovered={hovered}
-            lineFromX={FX + FW / 2} lineFromY={FY + FH * 0.5} />
+            lineFromX={FX + FW * 0.4} lineFromY={FY + FH * 0.35} />
         </g>
 
         {/* FACADE — RIGHT side of building */}
@@ -262,7 +262,7 @@ export default function ConstructionMapPage() {
           <rect x={BX+78} y={BY+BH-48} width="54" height="48" rx="3" fill={dk ? "#2a3848" : "#5a4a3a"} stroke={dk ? "#4a6070" : "#4a3a2a"} strokeWidth="1.5" />
           <circle cx={BX+122} cy={BY+BH-22} r="3" fill={dk ? "#8ab0d0" : "#c8a868"} />
           <FramedLabel x={lcX} y={aboveY.facade} text="Фасад" dk={dk} id="facade" hovered={hovered}
-            lineFromX={BX + BW / 2} lineFromY={BY + 30} />
+            lineFromX={BX + 40} lineFromY={BY + 20} />
         </g>
 
         {/* ROOF */}
@@ -275,7 +275,7 @@ export default function ConstructionMapPage() {
             return <line key={`rt-${t}`} x1={RoofLeft+(mid-RoofLeft)*(1-t)+10} y1={ly} x2={RoofRight-(RoofRight-mid)*(1-t)-10} y2={ly} stroke={dk ? "#4a6888" : "#4a6888"} strokeWidth="0.6" opacity="0.4" />;
           })}
           <FramedLabel x={lcX} y={aboveY.roof} text="Кровля" dk={dk} id="roof" hovered={hovered}
-            lineFromX={(RoofLeft + RoofRight) / 2} lineFromY={RoofPeak + 6} />
+            lineFromX={(RoofLeft + RoofRight) / 2 + 80} lineFromY={RoofPeak + 12} />
         </g>
 
         {/* EARTHWORK — RIGHT side */}
