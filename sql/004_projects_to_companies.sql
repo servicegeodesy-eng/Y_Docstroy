@@ -51,7 +51,7 @@ INSERT INTO company_members (company_id, user_id, role)
 SELECT DISTINCT
   (SELECT id FROM companies WHERE name = 'ООО "СУ-10"' LIMIT 1),
   p.created_by,
-  'member'
+  'member'::company_role
 FROM projects p
 WHERE p.created_by IS NOT NULL
 ON CONFLICT (company_id, user_id) DO NOTHING;
@@ -87,7 +87,7 @@ CREATE INDEX idx_project_companies_company ON project_companies (company_id);
 
 -- Автоматически добавить компанию-владельца в project_companies
 INSERT INTO project_companies (project_id, company_id, role)
-SELECT id, company_id, 'owner'
+SELECT id, company_id, 'owner'::project_company_role
 FROM projects
 ON CONFLICT (project_id, company_id) DO NOTHING;
 
@@ -125,7 +125,7 @@ BEGIN
 
   -- Добавить компанию-владельца в project_companies
   INSERT INTO project_companies (project_id, company_id, role)
-  VALUES (v_project_id, p_company_id, 'owner');
+  VALUES (v_project_id, p_company_id, 'owner'::project_company_role);
 
   RETURN v_project_id;
 END;

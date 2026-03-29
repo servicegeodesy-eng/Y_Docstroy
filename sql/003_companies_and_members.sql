@@ -86,7 +86,7 @@ RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   IF NEW.created_by IS NOT NULL THEN
     INSERT INTO company_members (company_id, user_id, role)
-    VALUES (NEW.id, NEW.created_by, 'owner')
+    VALUES (NEW.id, NEW.created_by, 'owner'::company_role)
     ON CONFLICT (company_id, user_id) DO NOTHING;
   END IF;
   RETURN NEW;
