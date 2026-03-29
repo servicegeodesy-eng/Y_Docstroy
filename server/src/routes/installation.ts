@@ -310,4 +310,87 @@ router.get('/available-materials', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// ============================================================================
+// Маски работ на подложках
+// ============================================================================
+
+// GET /api/installation/masks?overlay_id=... — маски работ для подложки
+router.get('/masks', async (req: AuthRequest, res: Response) => {
+  try {
+    const overlayId = req.query.overlay_id as string;
+    if (!overlayId) { res.status(400).json({ error: 'overlay_id обязателен' }); return; }
+
+    const result = await pool.query(
+      `SELECT m.id, m.work_id, m.overlay_id, m.polygon_points,
+              iw.status as work_status, iw.notes as work_notes,
+              iw.planned_date, iw.started_at, iw.completed_at,
+              get_work_progress(iw.id) as progress,
+              db.name as building_name, dwt.name as work_type_name,
+              df.name as floor_name, dc.name as construction_name
+       FROM cell_overlay_masks m
+       JOIN installation_works iw ON iw.id = m.work_id
+       LEFT JOIN dict_buildings db ON db.id = iw.building_id
+       LEFT JOIN dict_work_types dwt ON dwt.id = iw.work_type_id
+       LEFT JOIN dict_floors df ON df.id = iw.floor_id
+       LEFT JOIN dict_constructions dc ON dc.id = iw.construction_id
+       WHERE m.overlay_id = $1 AND m.work_id IS NOT NULL`,
+      [overlayId]
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Get work masks error:', err);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// POST /api/installation/masks — создать/обновить маску для работы
+router.post('/masks', async (req: AuthRequest, res: Response) => {
+  try {
+    const { work_id, overlay_id, polygon_points } = req.body;
+
+    if (!work_id || !overlay_id || !polygon_points) {
+      res.status(400).json({ error: 'work_id, overlay_id и polygon_points обязательны' });
+      return;
+    }
+
+    // Удаляем старые маски работы на этой подложке
+    await pool.query(
+      'DELETE FROM cell_overlay_masks WHERE work_id = $1 AND overlay_id = $2',
+      [work_id, overlay_id]
+    );
+
+    // Вставляем новые
+    const polygons = Array.isArray(polygon_points[0]?.x !== undefined ? [polygon_points] : polygon_points)
+      ? (Array.isArray(polygon_points[0]) ? polygon_points : [polygon_points])
+      : [polygon_points];
+
+    const results = [];
+    for (const poly of polygons) {
+      const result = await pool.query(
+        `INSERT INTO cell_overlay_masks (work_id, overlay_id, polygon_points)
+         VALUES ($1, $2, $3) RETURNING *`,
+        [work_id, overlay_id, JSON.stringify(poly)]
+      );
+      results.push(result.rows[0]);
+    }
+
+    res.status(201).json(results);
+  } catch (err) {
+    console.error('Create work mask error:', err);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// DELETE /api/installation/masks/:id
+router.delete('/masks/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    await pool.query('DELETE FROM cell_overlay_masks WHERE id = $1', [req.params.id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Delete work mask error:', err);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
 export default router;
