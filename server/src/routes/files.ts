@@ -13,6 +13,15 @@ import { Readable } from 'stream';
 const router = Router();
 router.use(authMiddleware);
 
+// Multer декодирует originalname как latin1 — исправляем на UTF-8
+function fixFileName(name: string): string {
+  try {
+    return Buffer.from(name, 'latin1').toString('utf-8');
+  } catch {
+    return name;
+  }
+}
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 100 * 1024 * 1024 }, // 100MB
@@ -61,7 +70,7 @@ router.post('/cell', upload.single('file'), async (req: AuthRequest, res: Respon
     }
 
     const companyId = await getProjectCompanyId(projectId);
-    const ext = path.extname(file.originalname);
+    const ext = path.extname(fixFileName(file.originalname));
     const storagePath = companyId
       ? `${companyId}/projects/${projectId}/cells/${cellId}/${uuidv4()}${ext}`
       : `${projectId}/${cellId}/${uuidv4()}${ext}`;
@@ -77,7 +86,7 @@ router.post('/cell', upload.single('file'), async (req: AuthRequest, res: Respon
     const result = await pool.query(
       `INSERT INTO cell_files (cell_id, file_name, storage_path, file_size, mime_type, uploaded_by)
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, storage_path`,
-      [cellId, file.originalname, storagePath, file.size, file.mimetype, userId]
+      [cellId, fixFileName(file.originalname), storagePath, file.size, file.mimetype, userId]
     );
 
     res.status(201).json(result.rows[0]);
@@ -127,7 +136,7 @@ router.post('/cell/:fileId/version', upload.single('file'), async (req: AuthRequ
 
     // Upload new version
     const companyId = await getProjectCompanyId(oldFile.project_id);
-    const ext = path.extname(file.originalname);
+    const ext = path.extname(fixFileName(file.originalname));
     const storagePath = companyId
       ? `${companyId}/projects/${oldFile.project_id}/cells/${oldFile.cell_id}/${uuidv4()}${ext}`
       : `${oldFile.project_id}/${oldFile.cell_id}/${uuidv4()}${ext}`;
@@ -144,7 +153,7 @@ router.post('/cell/:fileId/version', upload.single('file'), async (req: AuthRequ
     const result = await pool.query(
       `UPDATE cell_files SET file_name = $1, storage_path = $2, file_size = $3, mime_type = $4, uploaded_by = $5, updated_at = NOW()
        WHERE id = $6 RETURNING id, storage_path`,
-      [file.originalname, storagePath, file.size, file.mimetype, userId, fileId]
+      [fixFileName(file.originalname), storagePath, file.size, file.mimetype, userId, fileId]
     );
 
     res.json(result.rows[0]);
@@ -164,7 +173,7 @@ router.post('/overlay', upload.single('file'), async (req: AuthRequest, res: Res
       return;
     }
 
-    const ext = path.extname(file.originalname);
+    const ext = path.extname(fixFileName(file.originalname));
     let storagePath: string;
     let bucket: string;
 
@@ -206,7 +215,7 @@ router.post('/fileshare', upload.single('file'), async (req: AuthRequest, res: R
       return;
     }
 
-    const ext = path.extname(file.originalname);
+    const ext = path.extname(fixFileName(file.originalname));
     let storagePath: string;
     let bucket: string;
 
@@ -263,7 +272,8 @@ router.get('/download', async (req: AuthRequest, res: Response) => {
     }
 
     const fileName = path.basename(filePath);
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
+    const encodedName = encodeURIComponent(fileName);
+    res.setHeader('Content-Disposition', `attachment; filename="${encodedName}"; filename*=UTF-8''${encodedName}`);
 
     if (response.Body instanceof Readable) {
       response.Body.pipe(res);
