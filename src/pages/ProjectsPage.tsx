@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
+import { api } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
 import { useMobile } from "@/lib/MobileContext";
 import { useTheme } from "@/lib/ThemeContext";
@@ -40,7 +41,7 @@ function saveArchivedIds(ids: Set<string>) {
 }
 
 export default function ProjectsPage() {
-  const { user, isPortalAdmin, isGlobalReader, projectMemberships, profileName } = useAuth();
+  const { user, isPortalAdmin, isGlobalReader, projectMemberships, companies, profileName } = useAuth();
   const { isMobile } = useMobile();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
@@ -141,7 +142,7 @@ export default function ProjectsPage() {
     setLoading(false);
   }
 
-  async function handleCreate(name: string, description: string) {
+  async function handleCreate(name: string, description: string, companyId?: string) {
     const { data: profileCheck } = await supabase
       .from("profiles")
       .select("id")
@@ -154,14 +155,18 @@ export default function ProjectsPage() {
       );
     }
 
-    const projectId = crypto.randomUUID();
+    // Определяем company_id: переданный, единственная компания, или первая из списка
+    const resolvedCompanyId = companyId || companies[0]?.id;
+    if (!resolvedCompanyId) {
+      throw new Error("Не удалось определить компанию для проекта");
+    }
 
-    const { error } = await supabase.rpc("create_project_with_owner", {
-      p_project_id: projectId,
-      p_name: name,
-      p_description: description || null,
+    const { error } = await api.post("/api/projects", {
+      name,
+      description: description || null,
+      company_id: resolvedCompanyId,
     });
-    if (error) throw new Error(error.message);
+    if (error) throw new Error(error);
     await loadProjectsFromDb();
   }
 
@@ -514,6 +519,7 @@ export default function ProjectsPage() {
         open={showCreate}
         onClose={() => setShowCreate(false)}
         onSave={handleCreate}
+        companies={companies}
       />
       {editProject && (
         <ProjectModal

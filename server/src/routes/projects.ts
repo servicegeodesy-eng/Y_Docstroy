@@ -15,12 +15,12 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     let rows;
     if (admin) {
       const result = await pool.query(
-        'SELECT id, name, description, created_at, updated_at FROM projects ORDER BY created_at DESC'
+        'SELECT id, name, description, company_id, created_at, updated_at FROM projects ORDER BY created_at DESC'
       );
       rows = result.rows;
     } else {
       const result = await pool.query(
-        `SELECT p.id, p.name, p.description, p.created_at, p.updated_at, pm.role
+        `SELECT p.id, p.name, p.description, p.company_id, p.created_at, p.updated_at, pm.role
          FROM projects p
          JOIN project_members pm ON pm.project_id = p.id
          WHERE pm.user_id = $1
@@ -41,11 +41,29 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 router.post('/', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const { name, description } = req.body;
+    const { name, description, company_id } = req.body;
 
     if (!name) {
       res.status(400).json({ error: 'Название проекта обязательно' });
       return;
+    }
+
+    if (!company_id) {
+      res.status(400).json({ error: 'company_id обязателен' });
+      return;
+    }
+
+    // Проверяем что пользователь — участник компании
+    const admin = await isPortalAdmin(userId);
+    if (!admin) {
+      const memberCheck = await pool.query(
+        'SELECT id FROM company_members WHERE company_id = $1 AND user_id = $2',
+        [company_id, userId]
+      );
+      if (memberCheck.rows.length === 0) {
+        res.status(403).json({ error: 'Вы не являетесь участником этой компании' });
+        return;
+      }
     }
 
     const client = await pool.connect();
@@ -53,14 +71,19 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       await client.query('BEGIN');
 
       const projectResult = await client.query(
-        'INSERT INTO projects (name, description) VALUES ($1, $2) RETURNING *',
-        [name, description || null]
+        'INSERT INTO projects (name, description, company_id, created_by) VALUES ($1, $2, $3, $4) RETURNING *',
+        [name, description || null, company_id, userId]
       );
       const project = projectResult.rows[0];
 
       await client.query(
-        "INSERT INTO project_members (project_id, user_id, role) VALUES ($1, $2, 'admin')",
+        "INSERT INTO project_members (project_id, user_id, role, project_role) VALUES ($1, $2, 'admin', 'Администратор проекта')",
         [project.id, userId]
+      );
+
+      await client.query(
+        "INSERT INTO project_companies (project_id, company_id, role) VALUES ($1, $2, 'owner'::project_company_role)",
+        [project.id, company_id]
       );
 
       await client.query('COMMIT');

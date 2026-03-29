@@ -20,6 +20,7 @@ const RequestsPage = lazy(() => import("./pages/workspace/RequestsPage"));
 const FileSharePage = lazy(() => import("./pages/workspace/FileSharePage"));
 const StructurePage = lazy(() => import("./pages/workspace/StructurePage"));
 const InstallPage = lazy(() => import("./pages/InstallPage"));
+const LandingPage = lazy(() => import("./pages/LandingPage"));
 
 
 function PageLoader() {
@@ -118,7 +119,8 @@ export default function App() {
           {geo && <Route path="*" element={<GeoFallback />} />}
         </Route>
         <Route path="/install" element={<InstallPage />} />
-        <Route path="*" element={<Navigate to="/auth" replace />} />
+        <Route path="/" element={<LandingPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>
     </ErrorBoundary>

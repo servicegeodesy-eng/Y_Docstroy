@@ -18,14 +18,28 @@ const upload = multer({
   limits: { fileSize: 100 * 1024 * 1024 }, // 100MB
 });
 
+// Единый бакет с префиксами по компаниям
+const MAIN_BUCKET = process.env.S3_BUCKET || 'docstroy';
+
+// Legacy-маппинг для обратной совместимости (скачивание старых файлов)
 function getBucketName(bucketKey: string): string {
-  const map: Record<string, string> = {
+  if (bucketKey === MAIN_BUCKET) return MAIN_BUCKET;
+  const legacyMap: Record<string, string> = {
     'cell-files': process.env.S3_BUCKET_CELL_FILES || 'docstroy-cell-files',
     'overlay-images': process.env.S3_BUCKET_OVERLAY_IMAGES || 'docstroy-overlay-images',
     'project-images': process.env.S3_BUCKET_PROJECT_IMAGES || 'docstroy-project-images',
     'fileshare-files': process.env.S3_BUCKET_FILESHARE_FILES || 'docstroy-fileshare-files',
   };
-  return map[bucketKey] || bucketKey;
+  return legacyMap[bucketKey] || bucketKey;
+}
+
+// Получить company_id проекта
+async function getProjectCompanyId(projectId: string): Promise<string | null> {
+  const result = await pool.query(
+    'SELECT company_id FROM projects WHERE id = $1',
+    [projectId]
+  );
+  return result.rows[0]?.company_id || null;
 }
 
 // POST /api/files/cell — upload cell file
@@ -46,9 +60,12 @@ router.post('/cell', upload.single('file'), async (req: AuthRequest, res: Respon
       return;
     }
 
+    const companyId = await getProjectCompanyId(projectId);
     const ext = path.extname(file.originalname);
-    const storagePath = `${projectId}/${cellId}/${uuidv4()}${ext}`;
-    const bucket = getBucketName('cell-files');
+    const storagePath = companyId
+      ? `${companyId}/projects/${projectId}/cells/${cellId}/${uuidv4()}${ext}`
+      : `${projectId}/${cellId}/${uuidv4()}${ext}`;
+    const bucket = companyId ? MAIN_BUCKET : getBucketName('cell-files');
 
     await s3Client.send(new PutObjectCommand({
       Bucket: bucket,
@@ -109,9 +126,12 @@ router.post('/cell/:fileId/version', upload.single('file'), async (req: AuthRequ
     );
 
     // Upload new version
+    const companyId = await getProjectCompanyId(oldFile.project_id);
     const ext = path.extname(file.originalname);
-    const storagePath = `${oldFile.project_id}/${oldFile.cell_id}/${uuidv4()}${ext}`;
-    const bucket = getBucketName('cell-files');
+    const storagePath = companyId
+      ? `${companyId}/projects/${oldFile.project_id}/cells/${oldFile.cell_id}/${uuidv4()}${ext}`
+      : `${oldFile.project_id}/${oldFile.cell_id}/${uuidv4()}${ext}`;
+    const bucket = companyId ? MAIN_BUCKET : getBucketName('cell-files');
 
     await s3Client.send(new PutObjectCommand({
       Bucket: bucket,
@@ -138,14 +158,29 @@ router.post('/cell/:fileId/version', upload.single('file'), async (req: AuthRequ
 router.post('/overlay', upload.single('file'), async (req: AuthRequest, res: Response) => {
   try {
     const file = req.file;
+    const { projectId } = req.body;
     if (!file) {
       res.status(400).json({ error: 'Файл обязателен' });
       return;
     }
 
     const ext = path.extname(file.originalname);
-    const storagePath = `${uuidv4()}${ext}`;
-    const bucket = getBucketName('overlay-images');
+    let storagePath: string;
+    let bucket: string;
+
+    if (projectId) {
+      const companyId = await getProjectCompanyId(projectId);
+      if (companyId) {
+        storagePath = `${companyId}/projects/${projectId}/overlays/${uuidv4()}${ext}`;
+        bucket = MAIN_BUCKET;
+      } else {
+        storagePath = `${uuidv4()}${ext}`;
+        bucket = getBucketName('overlay-images');
+      }
+    } else {
+      storagePath = `${uuidv4()}${ext}`;
+      bucket = getBucketName('overlay-images');
+    }
 
     await s3Client.send(new PutObjectCommand({
       Bucket: bucket,
@@ -165,14 +200,29 @@ router.post('/overlay', upload.single('file'), async (req: AuthRequest, res: Res
 router.post('/fileshare', upload.single('file'), async (req: AuthRequest, res: Response) => {
   try {
     const file = req.file;
+    const { projectId } = req.body;
     if (!file) {
       res.status(400).json({ error: 'Файл обязателен' });
       return;
     }
 
     const ext = path.extname(file.originalname);
-    const storagePath = `${uuidv4()}${ext}`;
-    const bucket = getBucketName('fileshare-files');
+    let storagePath: string;
+    let bucket: string;
+
+    if (projectId) {
+      const companyId = await getProjectCompanyId(projectId);
+      if (companyId) {
+        storagePath = `${companyId}/projects/${projectId}/fileshare/${uuidv4()}${ext}`;
+        bucket = MAIN_BUCKET;
+      } else {
+        storagePath = `${uuidv4()}${ext}`;
+        bucket = getBucketName('fileshare-files');
+      }
+    } else {
+      storagePath = `${uuidv4()}${ext}`;
+      bucket = getBucketName('fileshare-files');
+    }
 
     await s3Client.send(new PutObjectCommand({
       Bucket: bucket,
@@ -300,7 +350,9 @@ router.delete('/cell/:fileId', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const bucket = getBucketName('cell-files');
+    // Определяем бакет: новый формат (company_id/projects/...) → MAIN_BUCKET, иначе legacy
+    const isNewFormat = fileRecord.storage_path.includes('/projects/');
+    const bucket = isNewFormat ? MAIN_BUCKET : getBucketName('cell-files');
 
     await s3Client.send(new DeleteObjectCommand({
       Bucket: bucket,

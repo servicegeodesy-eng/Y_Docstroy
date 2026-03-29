@@ -18,6 +18,12 @@ export interface ProjectMembership {
   project_description: string | null;
 }
 
+export interface CompanyMembership {
+  id: string;
+  name: string;
+  my_role: string;
+}
+
 export interface ProfileName {
   last_name: string;
   first_name: string;
@@ -33,6 +39,7 @@ interface AuthState {
   clearMustChangePassword: () => void;
   portalRolePerms: PortalRolePermission[];
   projectMemberships: ProjectMembership[];
+  companies: CompanyMembership[];
   profileName: ProfileName | null;
 }
 
@@ -45,6 +52,7 @@ const AuthContext = createContext<AuthState>({
   clearMustChangePassword: () => {},
   portalRolePerms: [],
   projectMemberships: [],
+  companies: [],
   profileName: null,
 });
 
@@ -56,6 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const [portalRolePerms, setPortalRolePerms] = useState<PortalRolePermission[]>([]);
   const [projectMemberships, setProjectMemberships] = useState<ProjectMembership[]>([]);
+  const [companies, setCompanies] = useState<CompanyMembership[]>([]);
   const [profileName, setProfileName] = useState<ProfileName | null>(null);
 
   useEffect(() => {
@@ -69,6 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setMustChangePassword(false);
       setPortalRolePerms([]);
       setProjectMemberships([]);
+      setCompanies([]);
       setProfileName(null);
       setLoading(false);
     }
@@ -162,6 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             };
             memberships: ProjectMembership[];
             portal_role_permissions: PortalRolePermission[];
+            companies: CompanyMembership[];
           }>('/api/auth/startup'),
         ])
       );
@@ -223,6 +234,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     memberships: ProjectMembership[];
     portal_role_permissions: PortalRolePermission[];
+    companies: CompanyMembership[];
   }) {
     const profile = data.profile ?? {};
     setIsPortalAdmin(profile.is_portal_admin ?? false);
@@ -239,6 +251,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
     setPortalRolePerms((data.portal_role_permissions ?? []) as PortalRolePermission[]);
     setProjectMemberships((data.memberships ?? []) as ProjectMembership[]);
+    setCompanies((data.companies ?? []) as CompanyMembership[]);
   }
 
   function clearMustChangePassword() {
@@ -256,6 +269,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         clearMustChangePassword,
         portalRolePerms,
         projectMemberships,
+        companies,
         profileName,
       }}
     >

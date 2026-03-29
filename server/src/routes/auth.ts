@@ -156,7 +156,7 @@ router.post('/login-by-name', async (req: AuthRequest, res: Response) => {
 // POST /api/auth/signup
 router.post('/signup', async (req: AuthRequest, res: Response) => {
   try {
-    const { email, password, last_name, first_name, middle_name, structure, organization, position, phone, project_id } = req.body;
+    const { email, password, last_name, first_name, middle_name, structure, organization, position, phone, project_id, company_id } = req.body;
 
     if (!email || !password || !last_name || !first_name) {
       res.status(400).json({ error: 'Email, пароль, фамилия и имя обязательны' });
@@ -180,6 +180,14 @@ router.post('/signup', async (req: AuthRequest, res: Response) => {
     );
 
     const user = result.rows[0];
+
+    // Привязка к компании (если указана)
+    if (company_id) {
+      await pool.query(
+        "INSERT INTO company_members (company_id, user_id, role) VALUES ($1, $2, 'member'::company_role) ON CONFLICT (company_id, user_id) DO NOTHING",
+        [company_id, user.id]
+      );
+    }
 
     if (project_id) {
       await pool.query(
@@ -251,7 +259,7 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
 // GET /api/auth/startup
 router.get('/startup', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    const [profileResult, membershipsResult, permissionsResult] = await Promise.all([
+    const [profileResult, membershipsResult, permissionsResult, companiesResult] = await Promise.all([
       pool.query(
         `SELECT is_portal_admin, is_global_reader, must_change_password,
                 last_name, first_name, middle_name
@@ -260,19 +268,29 @@ router.get('/startup', authMiddleware, async (req: AuthRequest, res: Response) =
       ),
       pool.query(
         `SELECT pm.project_id, pm.project_role, pm.role,
-                p.name AS project_name, p.description AS project_description
+                p.name AS project_name, p.description AS project_description,
+                p.company_id
          FROM project_members pm
          JOIN projects p ON p.id = pm.project_id
          WHERE pm.user_id = $1`,
         [req.userId]
       ),
       pool.query('SELECT * FROM portal_role_permissions'),
+      pool.query(
+        `SELECT c.id, c.name, cm.role AS my_role
+         FROM companies c
+         JOIN company_members cm ON cm.company_id = c.id
+         WHERE cm.user_id = $1
+         ORDER BY c.name`,
+        [req.userId]
+      ),
     ]);
 
     res.json({
       profile: profileResult.rows[0] || null,
       memberships: membershipsResult.rows,
       portal_role_permissions: permissionsResult.rows,
+      companies: companiesResult.rows,
     });
   } catch (err) {
     console.error('Startup error:', err);

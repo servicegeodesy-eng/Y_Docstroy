@@ -30,6 +30,7 @@ import fileshareRoutes from './routes/fileshare';
 import notificationRoutes from './routes/notifications';
 import pushRoutes from './routes/push';
 import rpcRoutes from './routes/rpc';
+import companyRoutes from './routes/companies';
 import genericRoutes from './routes/generic';
 
 dotenv.config();
@@ -49,6 +50,7 @@ app.use(cookieParser());
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/companies', companyRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/cells', cellRoutes);
 app.use('/api/files', fileRoutes);
