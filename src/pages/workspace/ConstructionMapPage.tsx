@@ -273,9 +273,9 @@ export default function ConstructionMapPage() {
           {Array.from({ length: 13 }, (_, i) => 55 + i * 72).map((x) => (
             <line key={`fp-${x}`} x1={x} y1={GL - 80} x2={x} y2={GL - 72} stroke={dk ? "#7aaad0" : "#2c5a8a"} strokeWidth="2" opacity="0.5" />
           ))}
-          {/* Label left side, high up */}
-          <FramedLabel x={4} y={8} text="Территория" text2="строительства" dk={dk} id="territory" hovered={hovered}
-            lineFromX={200} lineFromY={GL - 70} />
+          {/* Label left side, near fence */}
+          <FramedLabel x={4} y={GL - 100} text="Территория" text2="строительства" dk={dk} id="territory" hovered={hovered}
+            lineFromX={100} lineFromY={GL - 74} />
         </g>
 
         {/* ====== FACADE ====== */}
@@ -295,9 +295,9 @@ export default function ConstructionMapPage() {
           )}
           <rect x={BX + 78} y={BY + BH - 48} width="54" height="48" rx="3" fill={dk ? "#2a3848" : "#5a4a3a"} stroke={dk ? "#4a6070" : "#4a3a2a"} strokeWidth="1.5" />
           <circle cx={BX + 122} cy={BY + BH - 22} r="3" fill={dk ? "#8ab0d0" : "#c8a868"} />
-          {/* Label upper-left */}
-          <FramedLabel x={BX - 90} y={BY - 8} text="Фасад" anchor="end" dk={dk} id="facade" hovered={hovered}
-            lineFromX={BX + 20} lineFromY={BY + 40} />
+          {/* Label upper-left, close to facade */}
+          <FramedLabel x={BX - 10} y={BY + 6} text="Фасад" anchor="end" dk={dk} id="facade" hovered={hovered}
+            lineFromX={BX + 30} lineFromY={BY + 50} />
         </g>
 
         {/* ====== FRAME ====== */}
@@ -333,9 +333,9 @@ export default function ConstructionMapPage() {
             const mid = (RoofLeft + RoofRight) / 2;
             return <line key={`rt-${t}`} x1={RoofLeft + (mid - RoofLeft) * (1 - t) + 10} y1={ly} x2={RoofRight - (RoofRight - mid) * (1 - t) - 10} y2={ly} stroke={dk ? "#4a6888" : "#4a6888"} strokeWidth="0.6" opacity="0.4" />;
           })}
-          {/* Label top-right — line reaches roof slope */}
-          <FramedLabel x={RoofRight + 36} y={8} text="Кровля" dk={dk} id="roof" hovered={hovered}
-            lineFromX={(RoofLeft + RoofRight) / 2 + 60} lineFromY={RoofPeak + (BY - RoofPeak) * 0.35} />
+          {/* Label near roof, right side */}
+          <FramedLabel x={RoofRight + 6} y={RoofPeak - 6} text="Кровля" dk={dk} id="roof" hovered={hovered}
+            lineFromX={RoofRight - 30} lineFromY={RoofPeak + (BY - RoofPeak) * 0.3} />
         </g>
 
         {/* ====== EARTHWORK — sand pile on surface ====== */}
