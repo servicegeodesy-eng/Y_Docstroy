@@ -400,7 +400,7 @@ export default function ConstructionMapPage() {
           <rect x={ShoringLeft + SheetW} y={ShoringTop} width={ShoringRight - ShoringLeft - SheetW * 2} height={FoundH}
             fill={p("pat-concrete", "pat-concrete-dk")} stroke={dk ? "#5a7a90" : "#7a8a9a"} strokeWidth="1.5" />
           {/* Label left side */}
-          <FramedLabel x={4} y={GL + 56} text="Основание" dk={dk} id="foundation" hovered={hovered}
+          <FramedLabel x={ShoringLeft - 100} y={ShoringTop + 4} text="Основание" dk={dk} id="foundation" hovered={hovered}
             lineFromX={ShoringLeft + SheetW + 30} lineFromY={ShoringTop + FoundH / 2} />
         </g>
 
