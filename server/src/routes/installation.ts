@@ -394,7 +394,10 @@ router.get('/masks', async (req: AuthRequest, res: Response) => {
               iw.planned_date, iw.started_at, iw.completed_at,
               get_work_progress(iw.id) as progress,
               db.name as building_name, dwt.name as work_type_name,
-              df.name as floor_name, dc.name as construction_name
+              df.name as floor_name, dc.name as construction_name,
+              coalesce((SELECT sum(im.required_qty) FROM installation_materials im WHERE im.work_id = iw.id), 0) as total_required,
+              coalesce((SELECT sum(LEAST(im.required_qty, moi.delivered_qty)) FROM installation_materials im JOIN material_order_items moi ON moi.id = im.order_item_id WHERE im.work_id = iw.id), 0) as total_available,
+              coalesce((SELECT sum(im.used_qty) FROM installation_materials im WHERE im.work_id = iw.id), 0) as total_used
        FROM cell_overlay_masks m
        JOIN installation_works iw ON iw.id = m.work_id
        LEFT JOIN dict_buildings db ON db.id = iw.building_id

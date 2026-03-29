@@ -17,6 +17,9 @@ export interface WorkMaskData {
   planned_date: string | null;
   building_name: string | null;
   work_type_name: string | null;
+  total_required?: number;
+  total_available?: number;
+  total_used?: number;
 }
 
 interface Props {
@@ -467,15 +470,31 @@ export default function PlanCanvas({
                 onMouseEnter={(e) => handleWorkMouseEnter(mask, e)}
                 onMouseLeave={handleMouseLeave}
               />
-              <text
-                x={center.x * aspectW}
-                y={center.y * imageAspectH}
-                textAnchor="middle" dominantBaseline="central"
-                fontSize={11} fontWeight="700" fill={stroke}
-                className="pointer-events-none select-none"
-              >
-                {mask.progress}%
-              </text>
+              {mask.work_status === "completed" ? (
+                /* Завершено — галочка */
+                <text
+                  x={center.x * aspectW} y={center.y * imageAspectH}
+                  textAnchor="middle" dominantBaseline="central"
+                  fontSize={16} fontWeight="700" fill="#22c55e"
+                  className="pointer-events-none select-none"
+                >✓</text>
+              ) : mask.work_status === "planned" ? (
+                /* Запланировано — дата */
+                <text
+                  x={center.x * aspectW} y={center.y * imageAspectH}
+                  textAnchor="middle" dominantBaseline="central"
+                  fontSize={9} fontWeight="600" fill={stroke}
+                  className="pointer-events-none select-none"
+                >{mask.planned_date ? new Date(mask.planned_date).toLocaleDateString("ru") : "план"}</text>
+              ) : (
+                /* В процессе — нужно/поступило/использовано */
+                <text
+                  x={center.x * aspectW} y={center.y * imageAspectH}
+                  textAnchor="middle" dominantBaseline="central"
+                  fontSize={9} fontWeight="600" fill={stroke}
+                  className="pointer-events-none select-none"
+                >{mask.total_required || 0}/{mask.total_available || 0}/{mask.total_used || 0}</text>
+              )}
             </g>
           );
         })}
@@ -544,8 +563,12 @@ export default function PlanCanvas({
             <span className="text-[10px] font-medium" style={{ color: workMaskStroke(workTooltip.mask.work_status, workTooltip.mask.progress) }}>
               {WORK_STATUS_LABELS[workTooltip.mask.work_status] || workTooltip.mask.work_status}
             </span>
-            <span style={{ color: "var(--ds-text)" }}>Прогресс: {workTooltip.mask.progress}%</span>
           </div>
+          {workTooltip.mask.total_required != null && (
+            <div className="mt-1 text-[10px]" style={{ color: "var(--ds-text-muted)" }}>
+              Нужно: {workTooltip.mask.total_required} · Поступило: {workTooltip.mask.total_available} · Использовано: {workTooltip.mask.total_used}
+            </div>
+          )}
           {workTooltip.mask.planned_date && (
             <p className="mt-0.5" style={{ color: "var(--ds-text-faint)" }}>
               План: {shortDate(workTooltip.mask.planned_date)}
