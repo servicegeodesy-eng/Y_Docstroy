@@ -18,6 +18,23 @@ interface ProjectInfo {
   member_count: number;
 }
 
+// Ответ API /api/subscriptions/status
+interface ApiSubscriptionStatus {
+  company_name: string;
+  subscription: {
+    status: string;
+    expires_at: string | null;
+    suspended_at: string | null;
+    delete_scheduled_at: string | null;
+  } | null;
+  limits: {
+    users: LimitInfo;
+    projects: LimitInfo;
+    storage: StorageInfo;
+  };
+  projects: ProjectInfo[];
+}
+
 interface SubscriptionStatus {
   plan_name: string;
   status: "active" | "trial" | "suspended" | "expired";
@@ -97,11 +114,21 @@ export default function SubscriptionPanel() {
     async function load() {
       setLoading(true);
       setError(null);
-      const res = await api.get<SubscriptionStatus>("/api/subscriptions/status", { company_id: companyId! });
+      const res = await api.get<ApiSubscriptionStatus>("/api/subscriptions/status", { company_id: companyId! });
       if (res.error) {
         setError(res.error);
       } else if (res.data) {
-        setData(res.data);
+        const r = res.data;
+        setData({
+          plan_name: r.subscription?.status === "trial" ? "Пробный" : "Активный",
+          status: (r.subscription?.status || "active") as SubscriptionStatus["status"],
+          expires_at: r.subscription?.expires_at || null,
+          delete_scheduled_at: r.subscription?.delete_scheduled_at || null,
+          objects: r.limits.projects,
+          users: r.limits.users,
+          storage: r.limits.storage,
+          projects: r.projects,
+        });
       }
       setLoading(false);
     }
