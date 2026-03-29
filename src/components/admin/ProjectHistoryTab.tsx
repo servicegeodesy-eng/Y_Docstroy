@@ -16,39 +16,21 @@ interface HistoryRow {
   profiles: ProfileShort | null;
 }
 
+// Только действия по загрузке/скачиванию файлов
+const FILE_ACTIONS = new Set([
+  "file_uploaded",
+  "file_version_added",
+  "file_renamed",
+  "scan_attached",
+  "scan_deleted",
+]);
+
 const ACTION_LABELS: Record<string, string> = {
-  created: "Создание",
-  edited: "Редактирование",
-  status_changed: "Смена статуса",
-  signed: "Подписание",
-  signed_with_remark: "Подписание с замечанием",
-  signed_with_remarks: "Подписание с замечаниями",
-  signed_and_forwarded: "Подписание и пересылка",
-  delegated: "Делегирование",
-  rejected: "Возврат",
-  remarks: "Замечания",
-  sent: "Отправка на проверку",
-  sent_to_supervision: "Отправка на АН",
-  sent_to_acknowledge: "Отправка на ознакомление",
-  acknowledged: "Ознакомление",
-  approved_supervision: "Согласование АН",
-  supervision_approved: "Согласование АН",
-  correction_required: "На исправление (АН)",
-  correction_requested: "На исправление",
   file_uploaded: "Загрузка файла",
   file_version_added: "Новая версия файла",
-  final_signed: "Окончательное подписание",
-  archived: "Архивация",
+  file_renamed: "Переименование файла",
   scan_attached: "Прикрепление скана",
-  mask_created: "Создание наложения",
-  mask_edited: "Редактирование наложения",
-  request_created: "Создание заявки",
-  request_sent: "Отправка заявки",
-  request_executed: "Выполнение заявки",
-  request_remarks: "Замечание по заявке",
-  request_forwarded: "Пересылка заявки",
-  request_rejected: "Отклонение заявки",
-  request_acknowledged: "Ознакомление с заявкой",
+  scan_deleted: "Удаление скана",
 };
 
 
@@ -98,6 +80,7 @@ export default function ProjectHistoryTab() {
         profiles(last_name, first_name, middle_name)
       `)
       .in("cell_id", ids)
+      .in("action", Array.from(FILE_ACTIONS))
       .order("created_at", { ascending: false });
     if (!loadAll) query = query.limit(200);
     const { data } = await query;
