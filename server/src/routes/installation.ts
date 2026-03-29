@@ -72,7 +72,7 @@ router.get('/works', async (req: AuthRequest, res: Response) => {
           'required_qty', im.required_qty, 'used_qty', im.used_qty,
           'material_name', dm.name, 'unit_short', du.short_name,
           'order_number', mo.order_number,
-          'available_qty', moi.delivered_qty
+          'available_qty', LEAST(im.required_qty, moi.delivered_qty)
         )) FROM installation_materials im
           JOIN material_order_items moi ON moi.id = im.order_item_id
           JOIN dict_materials dm ON dm.id = moi.material_id
@@ -122,7 +122,8 @@ router.get('/works/:id', async (req: AuthRequest, res: Response) => {
 
     const materials = await pool.query(
       `SELECT im.*, dm.name as material_name, du.short_name as unit_short,
-              mo.order_number, moi.quantity as ordered_qty, moi.delivered_qty as available_qty
+              mo.order_number, moi.quantity as ordered_qty,
+              LEAST(im.required_qty, moi.delivered_qty) as available_qty
        FROM installation_materials im
        JOIN material_order_items moi ON moi.id = im.order_item_id
        JOIN dict_materials dm ON dm.id = moi.material_id
