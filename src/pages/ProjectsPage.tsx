@@ -13,6 +13,8 @@ import PermissionsTab from "@/components/admin/PermissionsTab";
 import RolePermissionsEditor from "@/components/admin/RolePermissionsEditor";
 import CellPermissionsPage from "@/components/admin/CellPermissionsPage";
 import ProfileModal from "@/components/ProfileModal";
+import CompanyMembersModal from "@/components/company/CompanyMembersModal";
+import CompanyTemplatesModal from "@/components/company/CompanyTemplatesModal";
 import { AppLogo } from "@/components/layout/GeoLogo";
 import { shortName, type ProfileShort } from "@/lib/utils";
 import { ROLES } from "@/types";
@@ -60,6 +62,8 @@ export default function ProjectsPage() {
   const [archivedIds, setArchivedIds] = useState<Set<string>>(getArchivedIds);
   const [showArchive, setShowArchive] = useState(false);
   const [unreadProjects, setUnreadProjects] = useState<Set<string>>(new Set());
+  const [companyMembersFor, setCompanyMembersFor] = useState<{ id: string; name: string } | null>(null);
+  const [companyTemplatesFor, setCompanyTemplatesFor] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     if (profileName) setProfile(profileName);
@@ -290,6 +294,30 @@ export default function ProjectsPage() {
               </div>
               {isPortalAdmin && (
                 <div className="flex items-center gap-2 flex-wrap">
+                  {companies.length > 0 && (
+                    <>
+                      <button
+                        onClick={() => setCompanyMembersFor(companies[0])}
+                        className="ds-btn-secondary flex items-center gap-1.5 text-xs sm:text-sm sm:gap-2"
+                      >
+                        <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
+                        <span className="hidden sm:inline">Участники компании</span>
+                        <span className="sm:hidden">Компания</span>
+                      </button>
+                      <button
+                        onClick={() => setCompanyTemplatesFor(companies[0])}
+                        className="ds-btn-secondary flex items-center gap-1.5 text-xs sm:text-sm sm:gap-2"
+                      >
+                        <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+                        </svg>
+                        <span className="hidden sm:inline">Шаблоны справочников</span>
+                        <span className="sm:hidden">Шаблоны</span>
+                      </button>
+                    </>
+                  )}
                   <button
                     onClick={() => setShowRolePerms(true)}
                     className="ds-btn-secondary flex items-center gap-1.5 text-xs sm:text-sm sm:gap-2"
@@ -579,6 +607,18 @@ export default function ProjectsPage() {
       )}
       {showCellPerms && (
         <CellPermissionsPage onClose={() => setShowCellPerms(false)} />
+      )}
+      {companyMembersFor && (
+        <CompanyMembersModal
+          company={companyMembersFor}
+          onClose={() => setCompanyMembersFor(null)}
+        />
+      )}
+      {companyTemplatesFor && (
+        <CompanyTemplatesModal
+          company={companyTemplatesFor}
+          onClose={() => setCompanyTemplatesFor(null)}
+        />
       )}
     </div>
   );
