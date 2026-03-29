@@ -200,13 +200,13 @@ export default function MaterialsPage() {
 
   if (!project) return null;
 
-  const orderedListRaw = orders.filter((o) =>
-    o.status === "ordered" || o.status === "partial" || o.status === "delivered"
-  );
+  const activeOrdersRaw = orders.filter((o) => o.status === "ordered" || o.status === "partial");
+  const archivedOrdersRaw = orders.filter((o) => o.status === "delivered");
   const draftListRaw = orders.filter((o) => o.status === "draft");
-  const orderedList = applyFilters(orderedListRaw);
+  const orderedList = applyFilters(activeOrdersRaw);
+  const archivedList = applyFilters(archivedOrdersRaw);
   const draftList = applyFilters(draftListRaw);
-  const totalCount = activeTab === "drafts" ? draftListRaw.length : orderedListRaw.length;
+  const totalCount = activeTab === "drafts" ? draftListRaw.length : activeOrdersRaw.length;
   const filteredCount = activeTab === "drafts" ? draftList.length : orderedList.length;
 
   const handleCreated = () => {
@@ -234,7 +234,7 @@ export default function MaterialsPage() {
   };
 
   const tabs: { key: Tab; label: string; count?: number }[] = [
-    { key: "ordered", label: "Заказано", count: orderedList.length },
+    { key: "ordered", label: "Заказано", count: orderedList.length || undefined },
     { key: "remaining", label: "Остатки" },
     { key: "drafts", label: "Черновики", count: draftList.length },
   ];
@@ -322,6 +322,7 @@ export default function MaterialsPage() {
       ) : activeTab === "ordered" ? (
         <OrderedTab
           orders={orderedList}
+          archivedOrders={archivedList}
           onClickOrder={setDetailOrder}
           canAdmin={canAdmin}
           onEdit={(o) => { setEditOrder(o); setShowCreate(true); }}
@@ -372,18 +373,17 @@ export default function MaterialsPage() {
 const STATUS_LABELS: Record<string, string> = { ordered: "Ожидают поступления", partial: "Частично", delivered: "Доставлено", draft: "Черновик" };
 const STATUS_COLORS: Record<string, string> = { ordered: "#3b82f6", partial: "#f59e0b", delivered: "#22c55e", draft: "var(--ds-text-faint)" };
 
-function OrderedTab({ orders, onClickOrder, canAdmin, onEdit, onDelete }: {
+function OrderedTab({ orders, archivedOrders, onClickOrder, canAdmin, onEdit, onDelete }: {
   orders: MaterialOrder[];
+  archivedOrders: MaterialOrder[];
   onClickOrder: (o: MaterialOrder) => void;
   canAdmin: boolean;
   onEdit: (o: MaterialOrder) => void;
   onDelete: (o: MaterialOrder) => void;
 }) {
   const [showArchive, setShowArchive] = useState(false);
-  const active = orders.filter((o) => o.status !== "delivered");
-  const archived = orders.filter((o) => o.status === "delivered");
 
-  if (orders.length === 0) {
+  if (orders.length === 0 && archivedOrders.length === 0) {
     return <EmptyState message="Нет заказов" hint="Нажмите «Заказать» для создания первой заявки на материалы" />;
   }
 
@@ -402,16 +402,16 @@ function OrderedTab({ orders, onClickOrder, canAdmin, onEdit, onDelete }: {
             </tr>
           </thead>
           <tbody>
-            {active.length === 0 && !showArchive ? (
+            {orders.length === 0 && !showArchive ? (
               <tr><td colSpan={canAdmin ? 6 : 5} className="px-4 py-6 text-center" style={{ color: "var(--ds-text-faint)" }}>Нет активных заказов</td></tr>
-            ) : active.map((order) => (
+            ) : orders.map((order) => (
               <OrderRow key={order.id} order={order} onClick={() => onClickOrder(order)} canAdmin={canAdmin} onEdit={() => onEdit(order)} onDelete={() => onDelete(order)} />
             ))}
           </tbody>
         </table>
       </div>
 
-      {archived.length > 0 && (
+      {archivedOrders.length > 0 && (
         <div className="mt-3">
           <button
             onClick={() => setShowArchive(!showArchive)}
@@ -421,13 +421,13 @@ function OrderedTab({ orders, onClickOrder, canAdmin, onEdit, onDelete }: {
             <svg className={`w-3 h-3 transition-transform ${showArchive ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
-            Архив ({archived.length})
+            Архив ({archivedOrders.length})
           </button>
           {showArchive && (
             <div className="ds-card overflow-hidden mt-1">
               <table className="ds-table">
                 <tbody>
-                  {archived.map((order) => (
+                  {archivedOrders.map((order) => (
                     <OrderRow key={order.id} order={order} onClick={() => onClickOrder(order)} canAdmin={canAdmin} onEdit={() => onEdit(order)} onDelete={() => onDelete(order)} />
                   ))}
                 </tbody>
