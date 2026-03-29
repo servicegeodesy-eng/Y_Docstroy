@@ -9,8 +9,8 @@ import pool from '../config/db';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { hasProjectAccess, isPortalAdmin, isGlobalReader } from '../middleware/permissions';
 import {
-  buildSelectSQL, isAllowedTable, resolveTableName,
-  requiresProjectAccess, getProjectIdFromQuery,
+  buildSelectSQL, isAllowedTable, isReadonlyTable, resolveTableName,
+  requiresProjectAccess, getProjectIdFromQuery, isSafeIdentifier,
 } from '../middleware/queryParser';
 
 const router = Router();
@@ -80,6 +80,10 @@ router.post('/:table', async (req: AuthRequest, res: Response) => {
       res.status(400).json({ error: `Таблица ${table} не поддерживается` });
       return;
     }
+    if (isReadonlyTable(table)) {
+      res.status(403).json({ error: `Запись в таблицу ${table} запрещена` });
+      return;
+    }
 
     const body = req.body;
     const isUpsert = body?._upsert === true;
@@ -90,6 +94,10 @@ router.post('/:table', async (req: AuthRequest, res: Response) => {
 
     for (const row of rows) {
       const keys = Object.keys(row);
+      if (keys.some(k => !isSafeIdentifier(k))) {
+        res.status(400).json({ error: 'Недопустимое имя колонки' });
+        return;
+      }
       const vals = Object.values(row).map(v =>
         v !== null && typeof v === 'object' ? JSON.stringify(v) : v
       );
@@ -123,9 +131,17 @@ router.patch('/:table/:id', async (req: AuthRequest, res: Response) => {
       res.status(400).json({ error: `Таблица ${table} не поддерживается` });
       return;
     }
+    if (isReadonlyTable(table)) {
+      res.status(403).json({ error: `Запись в таблицу ${table} запрещена` });
+      return;
+    }
 
     const data = req.body as Record<string, unknown>;
     const keys = Object.keys(data);
+    if (keys.some(k => !isSafeIdentifier(k))) {
+      res.status(400).json({ error: 'Недопустимое имя колонки' });
+      return;
+    }
     const vals = Object.values(data).map(v =>
       v !== null && typeof v === 'object' ? JSON.stringify(v) : v
     );
@@ -166,6 +182,10 @@ router.patch('/:table', async (req: AuthRequest, res: Response) => {
       res.status(400).json({ error: `Таблица ${table} не поддерживается` });
       return;
     }
+    if (isReadonlyTable(table)) {
+      res.status(403).json({ error: `Запись в таблицу ${table} запрещена` });
+      return;
+    }
 
     const { _filters, ...data } = req.body as Record<string, unknown>;
     const filters = _filters as { column: string; op: string; value: unknown }[] | undefined;
@@ -176,6 +196,14 @@ router.patch('/:table', async (req: AuthRequest, res: Response) => {
     }
 
     const keys = Object.keys(data);
+    if (keys.some(k => !isSafeIdentifier(k))) {
+      res.status(400).json({ error: 'Недопустимое имя колонки' });
+      return;
+    }
+    if (filters.some(f => !isSafeIdentifier(f.column))) {
+      res.status(400).json({ error: 'Недопустимое имя колонки в фильтре' });
+      return;
+    }
     if (keys.length === 0) {
       res.status(400).json({ error: 'Нечего обновлять' });
       return;
@@ -227,6 +255,10 @@ router.delete('/:table/:id', async (req: AuthRequest, res: Response) => {
       res.status(400).json({ error: `Таблица ${table} не поддерживается` });
       return;
     }
+    if (isReadonlyTable(table)) {
+      res.status(403).json({ error: `Удаление из таблицы ${table} запрещено` });
+      return;
+    }
 
     const result = await pool.query(
       `DELETE FROM "${table}" WHERE id = $1 RETURNING *`,
@@ -256,6 +288,10 @@ router.delete('/:table', async (req: AuthRequest, res: Response) => {
       res.status(400).json({ error: `Таблица ${table} не поддерживается` });
       return;
     }
+    if (isReadonlyTable(table)) {
+      res.status(403).json({ error: `Удаление из таблицы ${table} запрещено` });
+      return;
+    }
 
     const q = req.query as Record<string, string>;
     const whereParts: string[] = [];
@@ -264,6 +300,10 @@ router.delete('/:table', async (req: AuthRequest, res: Response) => {
 
     for (const [key, rawValue] of Object.entries(q)) {
       if (key === '_table' || key === 'select') continue;
+      if (!isSafeIdentifier(key)) {
+        res.status(400).json({ error: 'Недопустимое имя колонки в фильтре' });
+        return;
+      }
       const value = rawValue as string;
       if (value.startsWith('eq.')) {
         whereParts.push(`"${key}" = $${idx++}`);

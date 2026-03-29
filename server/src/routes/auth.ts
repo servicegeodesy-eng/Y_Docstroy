@@ -8,13 +8,13 @@ import { authMiddleware, AuthRequest } from '../middleware/auth';
 const router = Router();
 
 function generateAccessToken(userId: string): string {
-  return jwt.sign({ userId }, process.env.JWT_SECRET || '', {
+  return jwt.sign({ userId }, process.env.JWT_SECRET!, {
     expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as string,
   } as jwt.SignOptions);
 }
 
 function generateRefreshToken(userId: string): string {
-  return jwt.sign({ userId }, process.env.JWT_REFRESH_SECRET || '', {
+  return jwt.sign({ userId }, process.env.JWT_REFRESH_SECRET!, {
     expiresIn: (process.env.JWT_REFRESH_EXPIRES_IN || '30d') as string,
   } as jwt.SignOptions);
 }
@@ -213,7 +213,7 @@ router.post('/refresh', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET || '') as { userId: string };
+    const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET!) as { userId: string };
     const access_token = generateAccessToken(decoded.userId);
 
     res.json({ access_token });
@@ -368,7 +368,8 @@ router.post('/reset-password', async (req: AuthRequest, res: Response) => {
       [password_hash, result.rows[0].id]
     );
 
-    console.log(`[RESET PASSWORD] User ${email}: temp password = ${tempPassword}`);
+    // Пароль НЕ логируем — безопасность
+    console.log(`[RESET PASSWORD] Password reset for ${email}`);
 
     res.json({ ok: true });
   } catch (err) {

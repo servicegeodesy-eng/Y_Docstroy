@@ -27,7 +27,7 @@ const pool = new Pool({
   max: 20,
   statement_timeout: 10000,
   ssl: {
-    rejectUnauthorized: false,
+    rejectUnauthorized: !!caCert,
     ca: caCert || undefined,
   },
 });

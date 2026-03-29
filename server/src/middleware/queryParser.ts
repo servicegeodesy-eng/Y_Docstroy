@@ -10,6 +10,12 @@
 
 import { Request } from 'express';
 
+// Защита от SQL-инъекции через имена колонок/таблиц
+const SAFE_IDENTIFIER = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+export function isSafeIdentifier(name: string): boolean {
+  return SAFE_IDENTIFIER.test(name) && name.length <= 64;
+}
+
 // ============================================================================
 // FK metadata
 // ============================================================================
@@ -142,6 +148,16 @@ const ALLOWED_TABLES = new Set([
 
 export function isAllowedTable(table: string): boolean {
   return ALLOWED_TABLES.has(table);
+}
+
+// Таблицы, доступные только для чтения через generic CRUD
+// Мутации (POST/PATCH/DELETE) запрещены — используйте специализированные routes
+const READONLY_TABLES = new Set([
+  'users', 'portal_role_permissions', 'user_permissions', 'refresh_tokens',
+]);
+
+export function isReadonlyTable(table: string): boolean {
+  return READONLY_TABLES.has(table);
 }
 
 // ============================================================================

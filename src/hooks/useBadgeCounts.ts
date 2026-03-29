@@ -45,19 +45,6 @@ export function useBadgeCounts(projectId?: string): BadgeCounts & { refresh: () 
     if (!token) return;
 
     let closed = false;
-
-    // Попытка SSE
-    const url = `${API_URL}/api/badges/stream`;
-    const es = new EventSource(url, {
-      // EventSource не поддерживает headers нативно,
-      // поэтому передаём token через query (безопасно по HTTPS)
-    });
-
-    // EventSource не поддерживает кастомные headers.
-    // Используем fetch-based подход вместо нативного EventSource.
-    es.close(); // закрываем нативный — используем свою реализацию
-
-    // Своя реализация SSE через fetch для поддержки Authorization header
     const abortController = new AbortController();
 
     async function connectSSE() {
