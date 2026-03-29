@@ -290,7 +290,7 @@ export default function ConstructionMapPage() {
             return <line key={`rt-${t}`} x1={RoofLeft+(mid-RoofLeft)*(1-t)+10} y1={ly} x2={RoofRight-(RoofRight-mid)*(1-t)-10} y2={ly} stroke={dk ? "#4a6888" : "#4a6888"} strokeWidth="0.6" opacity="0.4" />;
           })}
           <FramedLabel x={lcX} y={aboveY.roof} text="Кровля" dk={dk} id="roof" hovered={hovered}
-            lineFromX={(RoofLeft + RoofRight) / 2 + 40} lineFromY={RoofPeak + 4} />
+            lineFromX={RoofRight - 60} lineFromY={RoofPeak + (BY - RoofPeak) * 0.15} />
         </g>
 
         {/* EARTHWORK — RIGHT side */}
@@ -333,7 +333,7 @@ export default function ConstructionMapPage() {
             </g>);
           })}
           <FramedLabel x={lcX} y={belowY.piles} text="Сваи" dk={dk} id="piles" hovered={hovered}
-            lineFromX={ShoringLeft + SheetW + 60} lineFromY={PitTop + PileLen * 0.6} />
+            lineFromX={ShoringLeft + SheetW + 24} lineFromY={PitTop + PileLen * 0.4} />
         </g>
       </svg>
     </div>
