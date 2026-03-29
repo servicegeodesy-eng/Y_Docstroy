@@ -188,6 +188,15 @@ export default function OverlayEditor({
                     <option value="plan">План</option>
                     <option value="facades">Фасады</option>
                     <option value="landscaping">Благоустройство</option>
+                    <option value="roof">Кровля</option>
+                    <option value="floors">Полы и потолки</option>
+                    <option value="walls">Стены</option>
+                    <option value="frame">Каркас</option>
+                    <option value="territory">Территория строительства</option>
+                    <option value="earthwork">Объёмы земляных масс</option>
+                    <option value="foundation">Основание</option>
+                    <option value="shoring">Ограждение котлована</option>
+                    <option value="piles">Сваи</option>
                   </select>
                   {/* Сетки осей */}
                   {!deleteMode && (() => {

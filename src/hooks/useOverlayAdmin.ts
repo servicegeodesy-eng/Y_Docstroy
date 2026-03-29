@@ -42,6 +42,15 @@ export const TAB_TYPE_INLINE: Record<string, { borderColor: string; background: 
   plan: { borderColor: "color-mix(in srgb, var(--ds-accent) 40%, var(--ds-border))", background: "color-mix(in srgb, var(--ds-accent) 10%, var(--ds-surface))", color: "var(--ds-accent)" },
   facades: { borderColor: "color-mix(in srgb, #f97316 40%, var(--ds-border))", background: "color-mix(in srgb, #f97316 10%, var(--ds-surface))", color: "#f97316" },
   landscaping: { borderColor: "color-mix(in srgb, #22c55e 40%, var(--ds-border))", background: "color-mix(in srgb, #22c55e 10%, var(--ds-surface))", color: "#22c55e" },
+  roof: { borderColor: "color-mix(in srgb, #3b82f6 40%, var(--ds-border))", background: "color-mix(in srgb, #3b82f6 10%, var(--ds-surface))", color: "#3b82f6" },
+  floors: { borderColor: "color-mix(in srgb, #8b5cf6 40%, var(--ds-border))", background: "color-mix(in srgb, #8b5cf6 10%, var(--ds-surface))", color: "#8b5cf6" },
+  walls: { borderColor: "color-mix(in srgb, #ec4899 40%, var(--ds-border))", background: "color-mix(in srgb, #ec4899 10%, var(--ds-surface))", color: "#ec4899" },
+  frame: { borderColor: "color-mix(in srgb, #6366f1 40%, var(--ds-border))", background: "color-mix(in srgb, #6366f1 10%, var(--ds-surface))", color: "#6366f1" },
+  territory: { borderColor: "color-mix(in srgb, #14b8a6 40%, var(--ds-border))", background: "color-mix(in srgb, #14b8a6 10%, var(--ds-surface))", color: "#14b8a6" },
+  earthwork: { borderColor: "color-mix(in srgb, #a16207 40%, var(--ds-border))", background: "color-mix(in srgb, #a16207 10%, var(--ds-surface))", color: "#a16207" },
+  foundation: { borderColor: "color-mix(in srgb, #78716c 40%, var(--ds-border))", background: "color-mix(in srgb, #78716c 10%, var(--ds-surface))", color: "#78716c" },
+  shoring: { borderColor: "color-mix(in srgb, #64748b 40%, var(--ds-border))", background: "color-mix(in srgb, #64748b 10%, var(--ds-surface))", color: "#64748b" },
+  piles: { borderColor: "color-mix(in srgb, #92400e 40%, var(--ds-border))", background: "color-mix(in srgb, #92400e 10%, var(--ds-surface))", color: "#92400e" },
 };
 
 /** Автоопределение типа вкладки по связям:
