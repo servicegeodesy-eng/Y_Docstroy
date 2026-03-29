@@ -55,7 +55,7 @@ interface TreeNode {
   cellStatus?: string;
 }
 
-const LEVEL_LABELS = ["Место работ", "Вид работ", "Уровни и виды", "Конструкции и зоны", "Комплект"];
+const LEVEL_LABELS = ["Место работ", "Вид работ", "Уровни/срезы", "Конструкция", "Комплект"];
 
 export default function ExplorerPage() {
   const { project, hasPermission } = useProject();

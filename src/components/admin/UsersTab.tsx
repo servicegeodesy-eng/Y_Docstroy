@@ -89,7 +89,7 @@ export default function UsersTab() {
           <thead>
             <tr>
               <th>ФИО</th>
-              <th>Организация</th>
+              <th>Компания</th>
               <th>Роль</th>
               <th>Группа</th>
               <th className="w-32">Действия</th>

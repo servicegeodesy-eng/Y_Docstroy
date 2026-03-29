@@ -127,8 +127,8 @@ export default function CellInfoTab({
           <div className={`grid gap-4 ${isMobile ? "grid-cols-1" : "grid-cols-2"}`}>
             <EditSelect label="Место работ" value={editBuilding} onChange={handleEditBuildingChange} items={buildings} />
             <EditSelect label="Вид работ" value={editWorkType} onChange={handleEditWorkTypeChange} items={filteredWorkTypes} disabled={workTypeDisabled} />
-            {showFloors && <EditSelect label="Уровни и виды" value={editFloor} onChange={setEditFloor} items={filteredFloors} />}
-            {showConstructions && <EditSelect label="Конструкции и зоны" value={editConstruction} onChange={setEditConstruction} items={filteredConstructions} />}
+            {showFloors && <EditSelect label="Уровни/срезы" value={editFloor} onChange={setEditFloor} items={filteredFloors} />}
+            {showConstructions && <EditSelect label="Конструкция" value={editConstruction} onChange={setEditConstruction} items={filteredConstructions} />}
             {showSets && <EditSelect label="Комплект" value={editSet} onChange={setEditSet} items={filteredSets} />}
             <div>
               <label className="ds-label">Выполнено (%)</label>
@@ -166,8 +166,8 @@ export default function CellInfoTab({
                 </button>
                 <InfoRow label="Место работ" value={cell.dict_buildings?.name} />
                 <InfoRow label="Вид работ" value={cell.dict_work_types?.name} />
-                {cell.dict_floors?.name && <InfoRow label="Уровни и виды" value={cell.dict_floors?.name} />}
-                <InfoRow label="Конструкции и зоны" value={cell.dict_constructions?.name} />
+                {cell.dict_floors?.name && <InfoRow label="Уровни/срезы" value={cell.dict_floors?.name} />}
+                <InfoRow label="Конструкция" value={cell.dict_constructions?.name} />
                 {cell.dict_sets?.name && <InfoRow label="Комплект" value={cell.dict_sets.name} />}
                 <div>
                   <span style={{ color: "var(--ds-text-muted)" }}>Выполнено:</span>{" "}

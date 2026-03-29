@@ -7,8 +7,8 @@ const FILTER_LABELS: Record<RequestFilterKey, string> = {
   requestWorkType: "Работа",
   building: "Место работ",
   workType: "Вид работ",
-  floor: "Уровни и виды",
-  construction: "Конструкции и зоны",
+  floor: "Уровни/срезы",
+  construction: "Конструкция",
 };
 
 

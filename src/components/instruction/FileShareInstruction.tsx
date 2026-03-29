@@ -65,7 +65,7 @@ export default function FileShareInstruction() {
       <div>
         <h3 className="text-xl font-bold mb-2">Фильтры и поиск</h3>
         <div className="space-y-1 text-sm" style={{ color: "var(--ds-text-muted)" }}>
-          <p>&bull; <InfoBadge>Место работ</InfoBadge>, <InfoBadge>Вид работ</InfoBadge>, <InfoBadge>Уровни</InfoBadge>, <InfoBadge>Конструкции</InfoBadge>, <InfoBadge>Работы</InfoBadge>, <InfoBadge>Метка</InfoBadge> — если файлы были привязаны к справочникам</p>
+          <p>&bull; <InfoBadge>Место работ</InfoBadge>, <InfoBadge>Вид работ</InfoBadge>, <InfoBadge>Уровни/срезы</InfoBadge>, <InfoBadge>Конструкция</InfoBadge>, <InfoBadge>Выполняемая работа</InfoBadge>, <InfoBadge>Метка</InfoBadge> — если файлы были привязаны к справочникам</p>
           <p>&bull; <InfoBadge>Дата</InfoBadge> — по периоду отправки</p>
           <p>&bull; <InfoBadge>Поиск</InfoBadge> — по комментарию, метке или имени файла</p>
           <p>&bull; Сортировка по дате (от новых к старым или наоборот)</p>

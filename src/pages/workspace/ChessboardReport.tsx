@@ -347,7 +347,7 @@ export default function ChessboardReport() {
   const FILTER_LABELS: Record<FilterKey, string> = {
     building: "Место работ",
     workType: "Вид работ",
-    construction: "Конструкции и зоны",
+    construction: "Конструкция",
     set: "Комплект",
   };
 

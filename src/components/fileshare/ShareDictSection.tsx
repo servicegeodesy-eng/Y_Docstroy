@@ -194,10 +194,10 @@ export default function ShareDictSection({ onChange, initialData }: Props) {
         <DictSelect label="Место работ" name="building" items={buildings} value={selBuilding} onChange={handleBuildingChange} />
         <DictSelect label="Вид работ" name="workType" items={filteredWorkTypes} value={selWorkType} onChange={handleWorkTypeChange} disabled={workTypeDisabled} />
         {showFloors && (
-          <DictSelect label="Уровни и виды" name="floor" items={filteredFloors} value={selFloor} onChange={setSelFloor} />
+          <DictSelect label="Уровни/срезы" name="floor" items={filteredFloors} value={selFloor} onChange={setSelFloor} />
         )}
-        <DictSelect label="Конструкции и зоны" name="construction" items={filteredConstructions} value={selConstruction} onChange={setSelConstruction} />
-        <DictSelect label="Работы" name="work" items={works} value={selWork} onChange={setSelWork} />
+        <DictSelect label="Конструкция" name="construction" items={filteredConstructions} value={selConstruction} onChange={setSelConstruction} />
+        <DictSelect label="Выполняемая работа" name="work" items={works} value={selWork} onChange={setSelWork} />
       </div>
 
       {/* Метка */}

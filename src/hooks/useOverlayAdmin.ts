@@ -20,7 +20,7 @@ function getImageDimensions(file: File): Promise<{ width: number; height: number
   });
 }
 
-// Конфиги связей подложки — порядок: Место работ → Вид работ → Уровни и виды → Конструкции и зоны
+// Конфиги связей подложки — порядок: Место работ → Вид работ → Уровни/срезы → Конструкция
 export const overlayLinkConfigs: DictLinkConfig[] = [
   DICT_LINK_CONFIGS[6], // Подложка → Место работ
   // Подложка → Вид работ (обратная связь через dict_work_type_overlays)
@@ -33,8 +33,8 @@ export const overlayLinkConfigs: DictLinkConfig[] = [
     parentLabel: "Подложка",
     childLabel: "Вид работ",
   },
-  DICT_LINK_CONFIGS[7], // Подложка → Уровни и виды
-  DICT_LINK_CONFIGS[8], // Подложка → Конструкции и зоны
+  DICT_LINK_CONFIGS[7], // Подложка → Уровни/срезы
+  DICT_LINK_CONFIGS[8], // Подложка → Конструкция
   DICT_LINK_CONFIGS[9], // Подложка → Работы
 ];
 

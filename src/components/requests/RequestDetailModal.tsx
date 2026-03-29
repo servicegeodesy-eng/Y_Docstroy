@@ -374,9 +374,9 @@ function RequestDetailModal({ cellId, onClose, onUpdated, onAcknowledged }: Prop
                 <DictSelect label="Место работ" name="building_id" items={buildings} required value={editBuilding} onChange={handleEditBuildingChange} />
                 <DictSelect label="Вид работ" name="work_type_id" items={filteredWorkTypes} required value={editWorkType} onChange={handleEditWorkTypeChange} disabled={workTypeDisabled} />
                 {showFloors && (
-                  <DictSelect label="Уровни и виды" name="floor_id" items={filteredFloors} value={editFloor} onChange={setEditFloor} />
+                  <DictSelect label="Уровни/срезы" name="floor_id" items={filteredFloors} value={editFloor} onChange={setEditFloor} />
                 )}
-                {showConstructions && <DictSelect label="Конструкции и зоны" name="construction_id" items={filteredConstructions} value={editConstruction} onChange={setEditConstruction} />}
+                {showConstructions && <DictSelect label="Конструкция" name="construction_id" items={filteredConstructions} value={editConstruction} onChange={setEditConstruction} />}
               </div>
               <div>
                 <label className="ds-label">Описание</label>
@@ -409,12 +409,12 @@ function RequestDetailModal({ cellId, onClose, onUpdated, onAcknowledged }: Prop
                 </div>
                 {cell.dict_floors?.name && (
                   <div>
-                    <span style={{ color: "var(--ds-text-muted)" }}>Уровни и виды:</span>{" "}
+                    <span style={{ color: "var(--ds-text-muted)" }}>Уровни/срезы:</span>{" "}
                     <span style={{ color: "var(--ds-text)" }}>{cell.dict_floors.name}</span>
                   </div>
                 )}
                 <div>
-                  <span style={{ color: "var(--ds-text-muted)" }}>Конструкции и зоны:</span>{" "}
+                  <span style={{ color: "var(--ds-text-muted)" }}>Конструкция:</span>{" "}
                   <span style={{ color: "var(--ds-text)" }}>{cell.dict_constructions?.name || "\u2014"}</span>
                 </div>
                 <div>

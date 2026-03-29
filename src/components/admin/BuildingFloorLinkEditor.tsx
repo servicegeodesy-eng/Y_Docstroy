@@ -9,7 +9,7 @@ interface Props {
 }
 
 /**
- * Редактор трёхсторонней связи: Место работ + Вид работ → Уровни и виды.
+ * Редактор трёхсторонней связи: Место работ + Вид работ → Уровни/срезы.
  * Показывает виды работ, привязанные к данному месту работ,
  * и для каждого позволяет выбрать уровни/виды.
  */
@@ -165,7 +165,7 @@ export default function BuildingFloorLinkEditor({ building, onBack }: Props) {
 
         {floors.length === 0 ? (
           <div className="px-4 py-8 text-center text-sm" style={{ color: "var(--ds-text-faint)" }}>
-            Справочник «Уровни и виды» пуст.
+            Справочник «Уровни/срезы» пуст.
           </div>
         ) : (
           <ul className="max-h-80 overflow-y-auto">
@@ -209,7 +209,7 @@ export default function BuildingFloorLinkEditor({ building, onBack }: Props) {
         </button>
         <div>
           <h3 className="text-sm font-medium" style={{ color: "var(--ds-text)" }}>
-            Уровни и виды: {building.name}
+            Уровни/срезы: {building.name}
           </h3>
           <p className="text-xs" style={{ color: "var(--ds-text-faint)" }}>
             Выберите вид работ для привязки уровней

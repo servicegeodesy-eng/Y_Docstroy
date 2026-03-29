@@ -5,8 +5,8 @@ import { getStatusBadgeClass } from "@/constants/statusColors";
 type FilterKey = "status" | "building" | "floor" | "workType" | "construction" | "set" | "manualTag";
 
 const FILTER_LABELS: Record<FilterKey, string> = {
-  building: "Место работ", workType: "Вид работ", floor: "Уровни и виды",
-  construction: "Конструкции и зоны", set: "Комплект", status: "Статус", manualTag: "Метки",
+  building: "Место работ", workType: "Вид работ", floor: "Уровни/срезы",
+  construction: "Конструкция", set: "Комплект", status: "Статус", manualTag: "Метки",
 };
 
 export type { FilterKey };

@@ -30,7 +30,7 @@ export default function GroInstruction() {
         <h3 className="text-xl font-bold mb-2">Фильтры и поиск</h3>
         <div className="space-y-1 text-sm" style={{ color: "var(--ds-text-muted)" }}>
           <p>&bull; <InfoBadge>Место работ</InfoBadge> — по зданию/корпусу</p>
-          <p>&bull; <InfoBadge>Уровни и виды</InfoBadge> — по уровню/этажу</p>
+          <p>&bull; <InfoBadge>Уровни/срезы</InfoBadge> — по уровню/этажу</p>
           <p>&bull; <InfoBadge>Дата</InfoBadge> — по периоду</p>
           <p>&bull; <InfoBadge>Поиск</InfoBadge> — по месту работ, уровню или описанию</p>
         </div>
@@ -47,7 +47,7 @@ export default function GroInstruction() {
 
       <StepCard step={2} title="Заполните поля" color="blue">
         <p>&bull; <strong>Место работ</strong> — обязательное поле, выберите из справочника.</p>
-        <p>&bull; <strong>Уровни и виды</strong> — необязательное поле.</p>
+        <p>&bull; <strong>Уровни/срезы</strong> — необязательное поле.</p>
         <p>&bull; <strong>Описание</strong> — текстовое описание.</p>
       </StepCard>
 

@@ -305,11 +305,11 @@ export interface DictLinkConfig {
 export const DICT_LINK_CONFIGS: DictLinkConfig[] = [
   // [0] Место работ → Вид работ
   { parentTable: 'dict_buildings', childTable: 'dict_work_types', linkTable: 'dict_building_work_types', parentFk: 'building_id', childFk: 'work_type_id', parentLabel: 'Место работ', childLabel: 'Вид работ' },
-  // [1] Вид работ → Конструкции и зоны
-  { parentTable: 'dict_work_types', childTable: 'dict_constructions', linkTable: 'dict_work_type_constructions', parentFk: 'work_type_id', childFk: 'construction_id', parentLabel: 'Вид работ', childLabel: 'Конструкции и зоны' },
+  // [1] Вид работ → Конструкция
+  { parentTable: 'dict_work_types', childTable: 'dict_constructions', linkTable: 'dict_work_type_constructions', parentFk: 'work_type_id', childFk: 'construction_id', parentLabel: 'Вид работ', childLabel: 'Конструкция' },
   // [2] DEPRECATED — replaced by dict_building_work_type_floors (triple link: building + work_type → floor)
   // Kept for index compatibility; not used in admin UI
-  { parentTable: 'dict_work_types', childTable: 'dict_floors', linkTable: 'dict_work_type_floors', parentFk: 'work_type_id', childFk: 'floor_id', parentLabel: 'Вид работ', childLabel: 'Уровни и виды' },
+  { parentTable: 'dict_work_types', childTable: 'dict_floors', linkTable: 'dict_work_type_floors', parentFk: 'work_type_id', childFk: 'floor_id', parentLabel: 'Вид работ', childLabel: 'Уровни/срезы' },
   // [3] Вид работ → Комплект
   { parentTable: 'dict_work_types', childTable: 'dict_sets', linkTable: 'dict_work_type_sets', parentFk: 'work_type_id', childFk: 'set_id', parentLabel: 'Вид работ', childLabel: 'Комплект' },
   // [4] Вид работ → Подложка
@@ -318,12 +318,12 @@ export const DICT_LINK_CONFIGS: DictLinkConfig[] = [
   { parentTable: 'dict_sets', childTable: 'dict_work_types', linkTable: 'dict_work_type_sets', parentFk: 'set_id', childFk: 'work_type_id', parentLabel: 'Комплект', childLabel: 'Вид работ' },
   // [6] Подложка → Место работ
   { parentTable: 'dict_overlays', childTable: 'dict_buildings', linkTable: 'dict_overlay_buildings', parentFk: 'overlay_id', childFk: 'building_id', parentLabel: 'Подложка', childLabel: 'Место работ' },
-  // [7] Подложка → Уровни и виды
-  { parentTable: 'dict_overlays', childTable: 'dict_floors', linkTable: 'dict_overlay_floors', parentFk: 'overlay_id', childFk: 'floor_id', parentLabel: 'Подложка', childLabel: 'Уровни и виды' },
-  // [8] Подложка → Конструкции и зоны
-  { parentTable: 'dict_overlays', childTable: 'dict_constructions', linkTable: 'dict_overlay_constructions', parentFk: 'overlay_id', childFk: 'construction_id', parentLabel: 'Подложка', childLabel: 'Конструкции и зоны' },
-  // [9] Подложка → Работы
-  { parentTable: 'dict_overlays', childTable: 'dict_works', linkTable: 'dict_overlay_works', parentFk: 'overlay_id', childFk: 'work_id', parentLabel: 'Подложка', childLabel: 'Работы' },
+  // [7] Подложка → Уровни/срезы
+  { parentTable: 'dict_overlays', childTable: 'dict_floors', linkTable: 'dict_overlay_floors', parentFk: 'overlay_id', childFk: 'floor_id', parentLabel: 'Подложка', childLabel: 'Уровни/срезы' },
+  // [8] Подложка → Конструкция
+  { parentTable: 'dict_overlays', childTable: 'dict_constructions', linkTable: 'dict_overlay_constructions', parentFk: 'overlay_id', childFk: 'construction_id', parentLabel: 'Подложка', childLabel: 'Конструкция' },
+  // [9] Подложка → Выполняемая работа
+  { parentTable: 'dict_overlays', childTable: 'dict_works', linkTable: 'dict_overlay_works', parentFk: 'overlay_id', childFk: 'work_id', parentLabel: 'Подложка', childLabel: 'Выполняемая работа' },
 ];
 
 // ============================================

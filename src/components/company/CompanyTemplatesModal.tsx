@@ -14,13 +14,12 @@ interface TemplateItem {
 }
 
 const TEMPLATE_TABLES = [
-  { key: "company_tpl_buildings", label: "Здания / Площадки" },
-  { key: "company_tpl_floors", label: "Этажи / Уровни" },
-  { key: "company_tpl_work_types", label: "Виды работ" },
-  { key: "company_tpl_constructions", label: "Конструкции" },
-  { key: "company_tpl_work_stages", label: "Этапы работ" },
-  { key: "company_tpl_sets", label: "Комплекты" },
-  { key: "company_tpl_organizations", label: "Организации" },
+  { key: "company_tpl_buildings", label: "Место работ" },
+  { key: "company_tpl_work_types", label: "Вид работ" },
+  { key: "company_tpl_floors", label: "Уровни/срезы" },
+  { key: "company_tpl_constructions", label: "Конструкция" },
+  { key: "company_tpl_sets", label: "Комплект" },
+  { key: "company_tpl_organizations", label: "Компания" },
 ] as const;
 
 type TableKey = typeof TEMPLATE_TABLES[number]["key"];
@@ -68,7 +67,8 @@ export default function CompanyTemplatesModal({
     }
   }
 
-  async function handleDelete(id: string) {
+  async function handleDelete(id: string, name: string) {
+    if (!confirm(`Удалить «${name}»?`)) return;
     await supabase.from(activeTab).delete().eq("id", id);
     await loadItems();
   }
@@ -205,7 +205,7 @@ export default function CompanyTemplatesModal({
 
                 {/* Удалить */}
                 <button
-                  onClick={() => handleDelete(item.id)}
+                  onClick={() => handleDelete(item.id, item.name)}
                   className="ds-icon-btn !p-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
                   title="Удалить"
                 >

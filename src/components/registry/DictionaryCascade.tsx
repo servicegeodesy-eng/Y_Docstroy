@@ -133,10 +133,10 @@ export default function DictionaryCascade({
         <DictSelect label="Место работ" name="building_id" items={buildings} required value={selBuilding} onChange={handleBuildingChange} />
         <DictSelect label="Вид работ" name="work_type_id" items={filteredWorkTypes} required value={selWorkType} onChange={handleWorkTypeChange} disabled={workTypeDisabled} />
         {selWorkType && showFloors && (
-          <DictSelect label="Уровни и виды" name="floor_id" items={filteredFloors} value={selFloor} onChange={setSelFloor} />
+          <DictSelect label="Уровни/срезы" name="floor_id" items={filteredFloors} value={selFloor} onChange={setSelFloor} />
         )}
         {selWorkType && showConstructions && (
-          <DictSelect label="Конструкции и зоны" name="construction_id" items={filteredConstructions} value={selConstruction} onChange={setSelConstruction} />
+          <DictSelect label="Конструкция" name="construction_id" items={filteredConstructions} value={selConstruction} onChange={setSelConstruction} />
         )}
         {selWorkType && showSets && (
           <DictSelect label="Комплект" name="set_id" items={filteredSets} value={selSet} onChange={setSelSet} />

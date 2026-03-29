@@ -20,8 +20,8 @@ import type { MaskWithCell } from "@/hooks/useCellMasks";
 /**
  * Режим фильтрации подложек по типу связей:
  * - plan: только Место работ + Вид работ (без уровней и конструкций)
- * - facades: все 4 связи (Место работ + Вид работ + Уровни и виды + Конструкции и зоны)
- * - landscaping: 3 связи (Место работ + Вид работ + Конструкции и зоны) без Уровней
+ * - facades: все 4 связи (Место работ + Вид работ + Уровни/срезы + Конструкция)
+ * - landscaping: 3 связи (Место работ + Вид работ + Конструкция) без Уровней
  */
 export type OverlayMode = "plan" | "facades" | "landscaping";
 
@@ -392,13 +392,13 @@ export default function PlanPage({ mode = "plan" }: Props) {
   const filterDefs = [
     { key: "building", label: "Место работ", value: selBuilding, items: filteredBuildings, onChange: handleBuildingChange },
     { key: "workType", label: "Вид работ", value: selWorkType, items: filteredWorkTypes, onChange: handleWorkTypeChange },
-    { key: "floor", label: "Уровни и виды", value: selFloor, items: filteredFloors, onChange: (v: string) => setSelFloor(v) },
-    { key: "construction", label: "Конструкции и зоны", value: selConstruction, items: filteredConstructions, onChange: (v: string) => setSelConstruction(v) },
+    { key: "floor", label: "Уровни/срезы", value: selFloor, items: filteredFloors, onChange: (v: string) => setSelFloor(v) },
+    { key: "construction", label: "Конструкция", value: selConstruction, items: filteredConstructions, onChange: (v: string) => setSelConstruction(v) },
     ...(filteredOverlays.length > 1
       ? [{ key: "overlay", label: "Подложка", value: selOverlay, items: filteredOverlays, onChange: (v: string) => setSelOverlay(v) }]
       : []),
     ...(canViewRequests && filteredWorks.length > 0
-      ? [{ key: "work", label: "Работы", value: selWork, items: filteredWorks, onChange: (v: string) => setSelWork(v) }]
+      ? [{ key: "work", label: "Выполняемая работа", value: selWork, items: filteredWorks, onChange: (v: string) => setSelWork(v) }]
       : []),
   ];
 

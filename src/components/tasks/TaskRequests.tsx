@@ -199,8 +199,8 @@ export default function TaskRequests() {
                   <th className="text-left px-2 py-1 text-[10px]">Работа</th>
                   <th className="text-left px-2 py-1 text-[10px]">Место работ</th>
                   <th className="text-left px-2 py-1 text-[10px]">Вид работ</th>
-                  <th className="text-left px-2 py-1 text-[10px]">Уровни и виды</th>
-                  <th className="text-left px-2 py-1 text-[10px]">Конструкции и зоны</th>
+                  <th className="text-left px-2 py-1 text-[10px]">Уровни/срезы</th>
+                  <th className="text-left px-2 py-1 text-[10px]">Конструкция</th>
                   <th className="text-left px-2 py-1 text-[10px]">Файлы</th>
                   <th className="text-left px-2 py-1 text-[10px]">Описание</th>
                   <th className="text-left px-2 py-1 text-[10px]">Статус</th>

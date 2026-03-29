@@ -22,10 +22,14 @@
       "Bash(rm -rf sql/dump)",
       "Bash(node -e \"const webpush = require\\(''web-push''\\); const keys = webpush.generateVAPIDKeys\\(\\); console.log\\(''VAPID_PUBLIC_KEY='' + keys.publicKey\\); console.log\\(''VAPID_PRIVATE_KEY='' + keys.privateKey\\);\")",
       "Bash(grep -rn \"from ''''.*\\\\.js''''\" src/)",
-      "Bash(find src:*)"
+      "Bash(find src:*)",
+      "Bash(xargs grep:*)",
+      "Bash(grep -rn '\"\"Конструкции и зоны\"\"' src/ --include=\"*.tsx\" --include=\"*.ts\" -l)",
+      "Bash(xargs sed:*)"
     ],
     "additionalDirectories": [
-      "c:\\Users\\usr\\claudeprojects\\tickhonovich\\DocStroy\\src"
+      "c:\\Users\\usr\\claudeprojects\\tickhonovich\\DocStroy\\src",
+      "c:\\Users\\usr\\claudeprojects\\tickhonovich\\Y_Docstroy\\.claude"
     ]
   }
 }

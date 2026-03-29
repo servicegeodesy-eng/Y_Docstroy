@@ -4,8 +4,8 @@ import DropdownPortal from "@/components/ui/DropdownPortal";
 export type ShareFilterKey = "building" | "workType" | "floor" | "construction" | "work" | "manualTag";
 
 const FILTER_LABELS: Record<ShareFilterKey, string> = {
-  building: "Место работ", workType: "Вид работ", floor: "Уровни и виды",
-  construction: "Конструкции и зоны", work: "Работы", manualTag: "Метки",
+  building: "Место работ", workType: "Вид работ", floor: "Уровни/срезы",
+  construction: "Конструкция", work: "Выполняемая работа", manualTag: "Метки",
 };
 
 interface Props {

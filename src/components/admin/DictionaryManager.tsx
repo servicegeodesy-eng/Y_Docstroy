@@ -17,14 +17,14 @@ interface DictionaryConfig {
   hasFloorLink?: boolean;
 }
 
-// Порядок иконок связей: Место работ -> Вид работ -> Уровни и виды -> Конструкции и зоны -> Комплект
 const DICTIONARIES: DictionaryConfig[] = [
-  { name: "Работы", table: "dict_works" },
+  { name: "Выполняемая работа", table: "dict_works" },
   { name: "Место работ", table: "dict_buildings", linkConfigs: [DICT_LINK_CONFIGS[0]], hasFloorLink: true },
   { name: "Вид работ", table: "dict_work_types", linkConfigs: [DICT_LINK_CONFIGS[1], DICT_LINK_CONFIGS[3]] },
-  { name: "Уровни и виды", table: "dict_floors" },
-  { name: "Конструкции и зоны", table: "dict_constructions" },
+  { name: "Уровни/срезы", table: "dict_floors" },
+  { name: "Конструкция", table: "dict_constructions" },
   { name: "Комплект", table: "dict_sets", linkConfigs: [DICT_LINK_CONFIGS[5]] },
+  { name: "Компания", table: "project_organizations" },
 ];
 
 export default function DictionaryManager() {
@@ -510,7 +510,7 @@ function DictionaryEditor({ config, onBack }: { config: DictionaryConfig; onBack
                       onClick={() => setFloorLinkItem(item)}
                       className="ds-icon-btn relative !p-1"
                       style={floorLinkedIds.has(item.id) ? { color: "var(--ds-text-muted)" } : { color: "var(--ds-text-faint)" }}
-                      title={`Уровни и виды${floorLinkedIds.has(item.id) ? " (установлена)" : ""}`}
+                      title={`Уровни/срезы${floorLinkedIds.has(item.id) ? " (установлена)" : ""}`}
                     >
                       {floorLinkedIds.has(item.id) && (
                         <span className="absolute inset-[-2px] rounded-full border-2 border-green-500 pointer-events-none" />

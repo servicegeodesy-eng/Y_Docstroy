@@ -70,8 +70,8 @@ export default function RegistryDesktopTable({
               { col: "name" as SortColumn, label: "Наименование", cls: "" },
               { col: "building" as SortColumn, label: "Место работ", cls: "" },
               { col: "workType" as SortColumn, label: "Вид работ", cls: "" },
-              { col: "floor" as SortColumn, label: "Уровни и виды", cls: "" },
-              { col: "construction" as SortColumn, label: "Конструкции и зоны", cls: "" },
+              { col: "floor" as SortColumn, label: "Уровни/срезы", cls: "" },
+              { col: "construction" as SortColumn, label: "Конструкция", cls: "" },
               { col: "set" as SortColumn, label: "Комплект", cls: "" },
             ] as { col: SortColumn; label: string; cls: string }[]).map(({ col, label, cls }) => (
               <th
