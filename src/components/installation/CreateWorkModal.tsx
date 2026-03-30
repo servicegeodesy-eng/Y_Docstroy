@@ -242,11 +242,11 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
 
   const allBalanced = validItems.length > 0 && validItems.every(it => getMaterialBalance(it).balanced);
 
-  const canSubmit = allBalanced && drawnPolygons.length > 0 && linkedOverlay;
+  const canSubmit = allBalanced && (!linkedOverlay || drawnPolygons.length > 0);
 
   const handleSubmit = async () => {
     if (!project) return;
-    if (drawnPolygons.length === 0) { setError("Необходимо отметить область на подложке"); return; }
+    if (linkedOverlay && drawnPolygons.length === 0) { setError("Необходимо отметить область на подложке"); return; }
     if (validItems.length === 0) { setError("Добавьте материалы"); return; }
     if (!allBalanced) { setError("Количество выбранных материалов должно совпадать с необходимым"); return; }
 
@@ -355,7 +355,6 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
           if (!selBuilding) warnings.push("Выберите место работ");
           if (!selWorkType) warnings.push("Выберите вид работ");
           if (linkedOverlay && drawnPolygons.length === 0) warnings.push("Отметьте область на подложке");
-          if (!linkedOverlay && selWorkType) warnings.push("Нет связанной подложки для выбранного вида работ");
           if (validItems.length === 0) warnings.push("Укажите необходимые материалы");
           if (validItems.length > 0 && !allBalanced) warnings.push("Выберите заявки для всех материалов (количество должно совпадать)");
           if (warnings.length === 0) return null;
