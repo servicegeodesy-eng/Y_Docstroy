@@ -6,7 +6,7 @@ import { PutObjectCommand } from '@aws-sdk/client-s3';
 import pool from '../config/db';
 import s3Client from '../config/s3';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
-import { hasProjectAccess } from '../middleware/permissions';
+import { hasProjectAccess, isPortalAdmin, isProjectAdmin } from '../middleware/permissions';
 
 const router = Router();
 router.use(authMiddleware);
@@ -199,6 +199,73 @@ router.post('/works', async (req: AuthRequest, res: Response) => {
     res.status(201).json(work);
   } catch (err) {
     console.error('Create work error:', err);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// ============================================================================
+// PUT /api/installation/works/:id — редактировать работу (только админы)
+// ============================================================================
+
+router.put('/works/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const workId = req.params.id;
+
+    const work = await pool.query('SELECT project_id FROM installation_works WHERE id = $1', [workId]);
+    if (work.rows.length === 0) { res.status(404).json({ error: 'Работа не найдена' }); return; }
+
+    const projectId = work.rows[0].project_id;
+    const admin = await isPortalAdmin(userId) || await isProjectAdmin(userId, projectId);
+    if (!admin) { res.status(403).json({ error: 'Только администраторы могут редактировать работы' }); return; }
+
+    const { building_id, work_type_id, floor_id, construction_id, planned_date, notes } = req.body;
+
+    const result = await pool.query(
+      `UPDATE installation_works SET
+        building_id = $1, work_type_id = $2, floor_id = $3, construction_id = $4,
+        planned_date = $5, notes = $6, updated_at = NOW()
+       WHERE id = $7 RETURNING *`,
+      [building_id || null, work_type_id || null, floor_id || null, construction_id || null,
+       planned_date || null, notes || null, workId]
+    );
+
+    await pool.query(
+      `INSERT INTO installation_log (work_id, action, created_by) VALUES ($1, 'edited', $2)`,
+      [workId, userId]
+    );
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Update work error:', err);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// ============================================================================
+// DELETE /api/installation/works/:id — удалить работу (только админы)
+// ============================================================================
+
+router.delete('/works/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const workId = req.params.id;
+
+    const work = await pool.query('SELECT project_id FROM installation_works WHERE id = $1', [workId]);
+    if (work.rows.length === 0) { res.status(404).json({ error: 'Работа не найдена' }); return; }
+
+    const projectId = work.rows[0].project_id;
+    const admin = await isPortalAdmin(userId) || await isProjectAdmin(userId, projectId);
+    if (!admin) { res.status(403).json({ error: 'Только администраторы могут удалять работы' }); return; }
+
+    // Удаляем маски на подложках
+    await pool.query('DELETE FROM cell_overlay_masks WHERE work_id = $1', [workId]);
+    // Удаляем работу (каскад: installation_materials, installation_log, installation_files)
+    await pool.query('DELETE FROM installation_works WHERE id = $1', [workId]);
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Delete work error:', err);
     res.status(500).json({ error: 'Ошибка сервера' });
   }
 });

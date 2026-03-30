@@ -2,13 +2,17 @@ import { useState, useEffect, useCallback } from "react";
 import { api } from "@/lib/api";
 import { useProject } from "@/lib/ProjectContext";
 import { useMobile } from "@/lib/MobileContext";
+import { useDictionaries } from "@/hooks/useDictionaries";
 import { formatSize, downloadStorage } from "@/lib/utils";
 import type { WorkMaterial } from "./WorkCard";
 import WorkMaskPreview from "./WorkMaskPreview";
 
 interface WorkFile { id: string; file_name: string; storage_path: string; file_size: number; category: string; created_at: string }
 interface WorkData {
-  id: string; status: string; building_name: string; work_type_name: string;
+  id: string; status: string;
+  building_id: string | null; work_type_id: string | null;
+  floor_id: string | null; construction_id: string | null;
+  building_name: string; work_type_name: string;
   floor_name: string | null; construction_name: string | null;
   planned_date: string; started_at: string | null; completed_at: string | null;
   notes: string | null; progress: number;
@@ -19,10 +23,17 @@ interface Props { workId: string; onClose: () => void; onUpdated: () => void }
 export default function WorkDetailModal({ workId, onClose, onUpdated }: Props) {
   const { isProjectAdmin, isPortalAdmin } = useProject();
   const { isMobile } = useMobile();
+  const { buildings, workTypes, floors, constructions } = useDictionaries();
   const [work, setWork] = useState<WorkData | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [overlayPreviewUrl, setOverlayPreviewUrl] = useState("");
+
+  // Edit mode
+  const isAdmin = isProjectAdmin || isPortalAdmin;
+  const [editing, setEditing] = useState(false);
+  const [editData, setEditData] = useState({ building_id: "", work_type_id: "", floor_id: "", construction_id: "", planned_date: "", notes: "" });
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   // Material usage
   const [usageAmounts, setUsageAmounts] = useState<Record<string, string>>({});
@@ -75,6 +86,36 @@ export default function WorkDetailModal({ workId, onClose, onUpdated }: Props) {
     await api.post(`/api/installation/works/${workId}/start`, {});
     setActionLoading(false);
     loadWork();
+  }
+
+  function startEditing() {
+    if (!work) return;
+    setEditData({
+      building_id: work.building_id || "",
+      work_type_id: work.work_type_id || "",
+      floor_id: work.floor_id || "",
+      construction_id: work.construction_id || "",
+      planned_date: work.planned_date || "",
+      notes: work.notes || "",
+    });
+    setEditing(true);
+  }
+
+  async function handleSaveEdit() {
+    setActionLoading(true);
+    const res = await api.put(`/api/installation/works/${workId}`, editData);
+    setActionLoading(false);
+    if (res.error) { alert(res.error); return; }
+    setEditing(false);
+    loadWork(); onUpdated();
+  }
+
+  async function handleDelete() {
+    setActionLoading(true);
+    const res = await api.delete(`/api/installation/works/${workId}`);
+    setActionLoading(false);
+    if (res.error) { alert(res.error); return; }
+    onClose(); onUpdated();
   }
 
   async function handleUseMaterial(matId: string) {
@@ -150,10 +191,35 @@ export default function WorkDetailModal({ workId, onClose, onUpdated }: Props) {
             </span>
             <span className="text-sm" style={{ color: "var(--ds-text-muted)" }}>{Math.round(work.progress || 0)}%</span>
           </div>
-          <button onClick={onClose} className="ds-icon-btn">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-          </button>
+          <div className="flex items-center gap-1">
+            {isAdmin && !editing && (
+              <>
+                <button onClick={startEditing} className="ds-icon-btn" title="Редактировать">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                </button>
+                <button onClick={() => setConfirmDelete(true)} className="ds-icon-btn hover:!text-red-500" title="Удалить">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                </button>
+              </>
+            )}
+            <button onClick={onClose} className="ds-icon-btn">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
         </div>
+
+        {/* Подтверждение удаления */}
+        {confirmDelete && (
+          <div className="px-6 py-3 flex items-center justify-between" style={{ background: "color-mix(in srgb, #ef4444 10%, var(--ds-surface))", borderBottom: "1px solid var(--ds-border)" }}>
+            <span className="text-sm font-medium" style={{ color: "#ef4444" }}>Удалить работу? Это действие необратимо.</span>
+            <div className="flex gap-2">
+              <button onClick={handleDelete} disabled={actionLoading} className="px-3 py-1.5 rounded-lg text-xs font-medium text-white" style={{ background: "#ef4444" }}>
+                {actionLoading ? "..." : "Да, удалить"}
+              </button>
+              <button onClick={() => setConfirmDelete(false)} className="ds-btn-secondary text-xs px-3 py-1.5">Отмена</button>
+            </div>
+          </div>
+        )}
 
         {/* Body — scrollable, two columns on desktop */}
         <div className="flex-1 overflow-y-auto p-6">
@@ -161,22 +227,71 @@ export default function WorkDetailModal({ workId, onClose, onUpdated }: Props) {
           {/* Left column — info + materials + files */}
           <div className={`space-y-5 ${isMobile ? "" : "flex-1 min-w-0"}`}>
           {/* Info */}
-          <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
-            <div><span className="text-xs" style={{ color: "var(--ds-text-faint)" }}>Место</span><p style={{ color: "var(--ds-text)" }}>{location}</p></div>
-            <div>
-              <span className="text-xs" style={{ color: "var(--ds-text-faint)" }}>Плановая дата</span>
-              <p style={{ color: "var(--ds-text)" }}>{work.planned_date ? new Date(work.planned_date).toLocaleDateString("ru") : "—"}</p>
-              {isPlanned && (
-                <button onClick={handleStart} disabled={actionLoading} className="ds-btn text-xs px-3 py-1.5 mt-2">{actionLoading ? "..." : "Начать процесс"}</button>
-              )}
-              {isInProgress && !showComplete && (
-                <button onClick={prepareComplete} disabled={actionLoading} className="ds-btn-secondary text-xs px-3 py-1.5 mt-2" style={{ color: "#22c55e", borderColor: "#22c55e" }}>Завершить монтаж</button>
-              )}
+          {editing ? (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--ds-text-faint)" }}>Место работ</label>
+                  <select className="ds-input w-full text-sm" value={editData.building_id} onChange={e => setEditData(d => ({ ...d, building_id: e.target.value }))}>
+                    <option value="">—</option>
+                    {buildings.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--ds-text-faint)" }}>Вид работ</label>
+                  <select className="ds-input w-full text-sm" value={editData.work_type_id} onChange={e => setEditData(d => ({ ...d, work_type_id: e.target.value }))}>
+                    <option value="">—</option>
+                    {workTypes.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--ds-text-faint)" }}>Уровень</label>
+                  <select className="ds-input w-full text-sm" value={editData.floor_id} onChange={e => setEditData(d => ({ ...d, floor_id: e.target.value }))}>
+                    <option value="">—</option>
+                    {floors.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--ds-text-faint)" }}>Конструкция</label>
+                  <select className="ds-input w-full text-sm" value={editData.construction_id} onChange={e => setEditData(d => ({ ...d, construction_id: e.target.value }))}>
+                    <option value="">—</option>
+                    {constructions.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1" style={{ color: "var(--ds-text-faint)" }}>Плановая дата</label>
+                <input type="date" className="ds-input text-sm" value={editData.planned_date} onChange={e => setEditData(d => ({ ...d, planned_date: e.target.value }))} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1" style={{ color: "var(--ds-text-faint)" }}>Примечание</label>
+                <textarea className="ds-input w-full text-sm" rows={2} value={editData.notes} onChange={e => setEditData(d => ({ ...d, notes: e.target.value }))} />
+              </div>
+              <div className="flex gap-2">
+                <button onClick={handleSaveEdit} disabled={actionLoading} className="ds-btn text-xs px-4 py-1.5">{actionLoading ? "..." : "Сохранить"}</button>
+                <button onClick={() => setEditing(false)} className="ds-btn-secondary text-xs px-4 py-1.5">Отмена</button>
+              </div>
             </div>
-            {work.started_at && <div><span className="text-xs" style={{ color: "var(--ds-text-faint)" }}>Начато</span><p style={{ color: "var(--ds-text)" }}>{new Date(work.started_at).toLocaleString("ru")}</p></div>}
-            {work.completed_at && <div><span className="text-xs" style={{ color: "var(--ds-text-faint)" }}>Завершено</span><p style={{ color: "var(--ds-text)" }}>{new Date(work.completed_at).toLocaleString("ru")}</p></div>}
-          </div>
-          {work.notes && <p className="text-sm" style={{ color: "var(--ds-text-muted)" }}>{work.notes}</p>}
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                <div><span className="text-xs" style={{ color: "var(--ds-text-faint)" }}>Место</span><p style={{ color: "var(--ds-text)" }}>{location}</p></div>
+                <div>
+                  <span className="text-xs" style={{ color: "var(--ds-text-faint)" }}>Плановая дата</span>
+                  <p style={{ color: "var(--ds-text)" }}>{work.planned_date ? new Date(work.planned_date).toLocaleDateString("ru") : "—"}</p>
+                  {isPlanned && (
+                    <button onClick={handleStart} disabled={actionLoading} className="ds-btn text-xs px-3 py-1.5 mt-2">{actionLoading ? "..." : "Начать процесс"}</button>
+                  )}
+                  {isInProgress && !showComplete && (
+                    <button onClick={prepareComplete} disabled={actionLoading} className="ds-btn-secondary text-xs px-3 py-1.5 mt-2" style={{ color: "#22c55e", borderColor: "#22c55e" }}>Завершить монтаж</button>
+                  )}
+                </div>
+                {work.started_at && <div><span className="text-xs" style={{ color: "var(--ds-text-faint)" }}>Начато</span><p style={{ color: "var(--ds-text)" }}>{new Date(work.started_at).toLocaleString("ru")}</p></div>}
+                {work.completed_at && <div><span className="text-xs" style={{ color: "var(--ds-text-faint)" }}>Завершено</span><p style={{ color: "var(--ds-text)" }}>{new Date(work.completed_at).toLocaleString("ru")}</p></div>}
+              </div>
+              {work.notes && <p className="text-sm" style={{ color: "var(--ds-text-muted)" }}>{work.notes}</p>}
+            </>
+          )}
 
           {/* Materials */}
           {work.materials.length > 0 && (
