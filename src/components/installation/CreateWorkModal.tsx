@@ -81,6 +81,7 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
   const [units, setUnits] = useState<UnitItem[]>([]);
   const [nResults, setNResults] = useState<Record<number, NomenclatureItem[]>>({});
   const [nOpen, setNOpen] = useState<number | null>(null);
+  const [uOpen, setUOpen] = useState<number | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Orders selection
@@ -172,11 +173,40 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
   };
 
   const selectNomenclature = (key: number, item: NomenclatureItem) => {
+    const unitMatch = item.unit_id ? units.find(u => u.id === item.unit_id) : null;
     setItems(prev => prev.map(it => it.key === key
-      ? { ...it, material_name: item.name, material_id: item.id, unit_id: item.unit_id || it.unit_id }
+      ? { ...it, material_name: item.name, material_id: item.id, unit_id: item.unit_id || it.unit_id, unit_name: unitMatch ? unitMatch.short_name : it.unit_name }
       : it));
     setNOpen(null);
     setNResults(p => ({ ...p, [key]: [] }));
+  };
+
+  // Unit filtering & creation
+  const getFilteredUnits = (query: string) => {
+    if (!query) return units;
+    const q = query.toLowerCase();
+    return units.filter(u => u.short_name.toLowerCase().includes(q) || u.name.toLowerCase().includes(q));
+  };
+
+  const selectUnit = (key: number, unit: UnitItem) => {
+    setItems(prev => prev.map(it => it.key === key
+      ? { ...it, unit_id: unit.id, unit_name: unit.short_name }
+      : it));
+    setUOpen(null);
+  };
+
+  const createAndSelectUnit = async (key: number, shortName: string) => {
+    if (!project || !shortName.trim()) return;
+    const res = await api.post<UnitItem>("/api/materials/units", {
+      project_id: project.id, short_name: shortName.trim(), name: shortName.trim(),
+    });
+    if (res.data) {
+      const newUnit = res.data;
+      if (!units.find(u => u.id === newUnit.id)) {
+        setUnits(prev => [...prev, newUnit]);
+      }
+      selectUnit(key, newUnit);
+    }
   };
 
   const removeItem = (key: number) => {
@@ -412,11 +442,45 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
                     </div>
                   )}
                 </div>
-                <select className="ds-input w-24 text-sm" value={it.unit_id}
-                  onChange={e => { const u = units.find(u => u.id === e.target.value); updateItem(it.key, "unit_id", e.target.value); if (u) updateItem(it.key, "unit_name", u.short_name); }}>
-                  <option value="">Ед.</option>
-                  {units.map(u => <option key={u.id} value={u.id}>{u.short_name}</option>)}
-                </select>
+                <div className="relative w-24">
+                  <input className="ds-input w-full text-sm" placeholder="Ед."
+                    value={it.unit_name}
+                    onChange={e => { updateItem(it.key, "unit_name", e.target.value); updateItem(it.key, "unit_id", ""); setUOpen(it.key); }}
+                    onFocus={() => setUOpen(it.key)}
+                    onBlur={() => setTimeout(() => { if (uOpen === it.key) setUOpen(null); }, 200)}
+                    onKeyDown={e => {
+                      if (e.key === "Enter" && it.unit_name && !it.unit_id) {
+                        e.preventDefault();
+                        const match = units.find(u => u.short_name.toLowerCase() === it.unit_name.toLowerCase());
+                        if (match) selectUnit(it.key, match);
+                        else createAndSelectUnit(it.key, it.unit_name);
+                      }
+                    }}
+                  />
+                  {uOpen === it.key && it.unit_name && (() => {
+                    const filtered = getFilteredUnits(it.unit_name);
+                    const exactMatch = units.some(u => u.short_name.toLowerCase() === it.unit_name.toLowerCase());
+                    if (filtered.length === 0 && !it.unit_name) return null;
+                    return (
+                      <div className="absolute z-10 top-full left-0 right-0 mt-1 rounded-lg shadow-lg border max-h-40 overflow-y-auto"
+                        style={{ background: "var(--ds-surface)", borderColor: "var(--ds-border)", minWidth: "120px" }}>
+                        {filtered.map(u => (
+                          <button key={u.id} className="w-full text-left px-3 py-1.5 text-sm hover:bg-[var(--ds-surface-sunken)]"
+                            onMouseDown={e => e.preventDefault()}
+                            onClick={() => selectUnit(it.key, u)}>{u.short_name}</button>
+                        ))}
+                        {!exactMatch && it.unit_name.trim() && (
+                          <button className="w-full text-left px-3 py-1.5 text-sm font-medium hover:bg-[var(--ds-surface-sunken)]"
+                            style={{ color: "var(--ds-accent)" }}
+                            onMouseDown={e => e.preventDefault()}
+                            onClick={() => createAndSelectUnit(it.key, it.unit_name)}>
+                            + Создать «{it.unit_name.trim()}»
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
                 <input className="ds-input w-20 text-sm text-center" type="number" min="0" step="0.01" placeholder="Кол-во"
                   value={it.required_qty} onChange={e => updateItem(it.key, "required_qty", e.target.value)} />
                 <button onClick={() => removeItem(it.key)} className="ds-icon-btn shrink-0">

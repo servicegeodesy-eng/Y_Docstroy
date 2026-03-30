@@ -453,6 +453,39 @@ router.get('/units', async (req: AuthRequest, res: Response) => {
 });
 
 // ============================================================================
+// POST /api/materials/units — создать единицу измерения
+// ============================================================================
+
+router.post('/units', async (req: AuthRequest, res: Response) => {
+  try {
+    const { project_id, name, short_name } = req.body;
+    if (!project_id || !short_name) {
+      res.status(400).json({ error: 'project_id и short_name обязательны' });
+      return;
+    }
+
+    // Проверяем дубликат по short_name
+    const existing = await pool.query(
+      'SELECT * FROM dict_units WHERE project_id = $1 AND short_name = $2',
+      [project_id, short_name]
+    );
+    if (existing.rows.length > 0) {
+      res.json(existing.rows[0]);
+      return;
+    }
+
+    const result = await pool.query(
+      'INSERT INTO dict_units (project_id, name, short_name) VALUES ($1, $2, $3) RETURNING *',
+      [project_id, name || short_name, short_name]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Create unit error:', err);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// ============================================================================
 // GET /api/materials/nomenclature?project_id=...&q=... — автокомплит номенклатуры
 // ============================================================================
 
