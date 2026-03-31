@@ -1,9 +1,13 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { AppLogo } from "@/components/layout/GeoLogo";
+import PricingSection, { type PlanKey } from "@/components/landing/PricingSection";
+import LeadFormModal from "@/components/landing/LeadFormModal";
 
 export default function LandingPage() {
   const { user } = useAuth();
+  const [selectedPlan, setSelectedPlan] = useState<PlanKey | null>(null);
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "var(--ds-surface-sunken)" }}>
@@ -141,6 +145,32 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* Pricing */}
+      <PricingSection onSelectPlan={setSelectedPlan} />
+
+      {/* CTA */}
+      <section className="py-12 sm:py-16" style={{ background: "var(--ds-surface)" }}>
+        <div className="max-w-3xl mx-auto px-4 text-center">
+          <h2 className="text-2xl sm:text-3xl font-bold mb-4" style={{ color: "var(--ds-text)" }}>
+            Готовы начать?
+          </h2>
+          <p className="text-sm sm:text-base mb-6" style={{ color: "var(--ds-text-muted)" }}>
+            Оставьте заявку — мы настроим проект по вашей рабочей документации
+            за 7 рабочих дней и передадим администратору компании.
+          </p>
+          <button onClick={() => setSelectedPlan("start")} className="ds-btn px-8 py-2.5 text-base">
+            Оставить заявку
+          </button>
+        </div>
+      </section>
+
+      {/* Lead form modal */}
+      <LeadFormModal
+        open={selectedPlan !== null}
+        planKey={selectedPlan}
+        onClose={() => setSelectedPlan(null)}
+      />
 
       {/* Footer */}
       <footer className="py-6 px-4 text-center" style={{ borderTop: "1px solid var(--ds-border)" }}>

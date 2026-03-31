@@ -36,6 +36,7 @@ import subscriptionRoutes from './routes/subscriptions';
 import materialRoutes from './routes/materials';
 import installationRoutes from './routes/installation';
 import companyRoutes from './routes/companies';
+import leadRoutes from './routes/leads';
 import genericRoutes from './routes/generic';
 
 dotenv.config();
@@ -94,6 +95,7 @@ app.use('/api/invites', inviteRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/materials', materialRoutes);
 app.use('/api/installation', installationRoutes);
+app.use('/api/leads', leadRoutes);
 
 // Generic CRUD fallback (MUST be last — catches /api/query/:table)
 app.use('/api/query', genericRoutes);
