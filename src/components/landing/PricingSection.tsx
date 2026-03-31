@@ -4,7 +4,7 @@ const PLANS = [
     name: "Пробный",
     price: "0",
     objects: 1,
-    users: 5,
+    users: 10,
     storage: "10 ГБ",
     popular: false,
   },
