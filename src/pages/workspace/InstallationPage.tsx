@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { api } from "@/lib/api";
 import { useProject } from "@/lib/ProjectContext";
 import { useAuth } from "@/lib/AuthContext";
@@ -13,7 +13,7 @@ const STATUS_COLORS: Record<string, string> = { planned: "#3b82f6", in_progress:
 type FilterKey = "building" | "workType" | "floor" | "construction";
 
 export default function InstallationPage() {
-  const { project, isProjectAdmin, isPortalAdmin } = useProject();
+  const { project } = useProject();
   const { user } = useAuth();
   const { isMobile } = useMobile();
 

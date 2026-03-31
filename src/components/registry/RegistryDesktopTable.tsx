@@ -145,7 +145,7 @@ export default function RegistryDesktopTable({
               )}
               <tr
                 className="cursor-pointer"
-                onDoubleClick={() => onDetailOpen(cell.id)}
+                onClick={() => onDetailOpen(cell.id)}
               >
                 <td className="px-4 py-1.5 whitespace-nowrap text-sm" style={{ color: "var(--ds-text-muted)" }}>
                   {formatDate(cell.created_at)}

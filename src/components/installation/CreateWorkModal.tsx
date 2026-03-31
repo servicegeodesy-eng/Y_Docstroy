@@ -78,9 +78,10 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
   const [uOpen, setUOpen] = useState<number | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Files, notes, submit
+  // Files, notes, tag, submit
   const [files, setFiles] = useState<File[]>([]);
   const [notes, setNotes] = useState("");
+  const [manualTag, setManualTag] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -221,6 +222,7 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
       construction_id: selConstruction || null,
       planned_date: plannedDate || null,
       notes: notes || null,
+      manual_tag: manualTag || null,
       materials,
     });
 
@@ -337,7 +339,7 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
             </div>
             <div className="mt-3">
               <label className="block text-xs font-medium mb-1" style={{ color: "var(--ds-text-muted)" }}>Плановая дата</label>
-              <input type="date" className="ds-input" value={plannedDate} onChange={e => setPlannedDate(e.target.value)} />
+              <input type="date" className="ds-input" value={plannedDate} min={new Date().toISOString().slice(0, 10)} onChange={e => setPlannedDate(e.target.value)} />
             </div>
           </Section>
 
@@ -465,9 +467,15 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
             </div>
           </Section>
 
-          {/* === Примечание === */}
-          <Section title="Примечание">
-            <textarea className="ds-input w-full text-sm" rows={3} placeholder="Комментарий к работе..."
+          {/* === Метка === */}
+          <Section title="Метка">
+            <input className="ds-input w-full text-sm" placeholder="Метка (например: этап 1, срочное...)"
+              value={manualTag} onChange={e => setManualTag(e.target.value)} />
+          </Section>
+
+          {/* === Описание === */}
+          <Section title="Описание">
+            <textarea className="ds-input w-full text-sm" rows={3} placeholder="Описание работы..."
               value={notes} onChange={e => setNotes(e.target.value)} />
           </Section>
 

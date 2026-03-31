@@ -134,7 +134,7 @@ router.get('/works/:id', async (req: AuthRequest, res: Response) => {
               COALESCE(dm.name, im.material_name) as material_name,
               COALESCE(du.short_name, du2.short_name, im.unit_name) as unit_short,
               mo.order_number, moi.quantity as ordered_qty,
-              CASE WHEN im.order_item_id IS NOT NULL THEN LEAST(im.required_qty, moi.delivered_qty) ELSE im.required_qty END as available_qty
+              CASE WHEN im.order_item_id IS NOT NULL THEN LEAST(im.required_qty, moi.delivered_qty) ELSE COALESCE(im.available_qty, 0) END as effective_available
        FROM installation_materials im
        LEFT JOIN material_order_items moi ON moi.id = im.order_item_id
        LEFT JOIN dict_materials dm ON dm.id = COALESCE(moi.material_id, im.material_id)
@@ -148,6 +148,13 @@ router.get('/works/:id', async (req: AuthRequest, res: Response) => {
       'SELECT * FROM installation_files WHERE work_id = $1 ORDER BY created_at', [workId]
     );
 
+    const documents = await pool.query(
+      `SELECT d.*, u.last_name, u.first_name
+       FROM installation_documents d
+       LEFT JOIN users u ON u.id = d.created_by
+       WHERE d.work_id = $1 ORDER BY d.created_at DESC`, [workId]
+    );
+
     const log = await pool.query(
       `SELECT il.*, u.last_name, u.first_name
        FROM installation_log il
@@ -155,7 +162,7 @@ router.get('/works/:id', async (req: AuthRequest, res: Response) => {
        WHERE il.work_id = $1 ORDER BY il.created_at DESC`, [workId]
     );
 
-    res.json({ ...work.rows[0], materials: materials.rows, files: files.rows, log: log.rows });
+    res.json({ ...work.rows[0], materials: materials.rows, files: files.rows, documents: documents.rows, log: log.rows });
   } catch (err) {
     console.error('Get work error:', err);
     res.status(500).json({ error: 'Ошибка сервера' });
@@ -170,16 +177,16 @@ router.post('/works', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
     const { project_id, building_id, work_type_id, floor_id, construction_id,
-            planned_date, notes, materials } = req.body;
+            planned_date, notes, manual_tag, materials } = req.body;
 
     if (!project_id) { res.status(400).json({ error: 'project_id обязателен' }); return; }
     if (!await hasProjectAccess(userId, project_id)) { res.status(403).json({ error: 'Нет доступа' }); return; }
 
     const workResult = await pool.query(
-      `INSERT INTO installation_works (project_id, building_id, work_type_id, floor_id, construction_id, planned_date, notes, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      `INSERT INTO installation_works (project_id, building_id, work_type_id, floor_id, construction_id, planned_date, notes, manual_tag, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
       [project_id, building_id || null, work_type_id || null, floor_id || null,
-       construction_id || null, planned_date || null, notes || null, userId]
+       construction_id || null, planned_date || null, notes || null, manual_tag || null, userId]
     );
     const work = workResult.rows[0];
 
@@ -232,15 +239,15 @@ router.put('/works/:id', async (req: AuthRequest, res: Response) => {
     const admin = await isPortalAdmin(userId) || await isProjectAdmin(userId, projectId);
     if (!admin) { res.status(403).json({ error: 'Только администраторы могут редактировать работы' }); return; }
 
-    const { building_id, work_type_id, floor_id, construction_id, planned_date, notes } = req.body;
+    const { building_id, work_type_id, floor_id, construction_id, planned_date, notes, manual_tag } = req.body;
 
     const result = await pool.query(
       `UPDATE installation_works SET
         building_id = $1, work_type_id = $2, floor_id = $3, construction_id = $4,
-        planned_date = $5, notes = $6, updated_at = NOW()
-       WHERE id = $7 RETURNING *`,
+        planned_date = $5, notes = $6, manual_tag = $7, updated_at = NOW()
+       WHERE id = $8 RETURNING *`,
       [building_id || null, work_type_id || null, floor_id || null, construction_id || null,
-       planned_date || null, notes || null, workId]
+       planned_date || null, notes || null, manual_tag || null, workId]
     );
 
     await pool.query(
@@ -323,6 +330,24 @@ router.post('/works/:id/use-material', async (req: AuthRequest, res: Response) =
 
     if (!installation_material_id || !quantity || quantity <= 0) {
       res.status(400).json({ error: 'installation_material_id и quantity обязательны' }); return;
+    }
+
+    // Проверяем что used_qty + quantity <= available_qty (не может превысить поступление)
+    const matCheck = await pool.query(
+      `SELECT im.*,
+        CASE WHEN im.order_item_id IS NOT NULL
+          THEN LEAST(im.required_qty, moi.delivered_qty)
+          ELSE im.available_qty END as effective_available
+       FROM installation_materials im
+       LEFT JOIN material_order_items moi ON moi.id = im.order_item_id
+       WHERE im.id = $1 AND im.work_id = $2`,
+      [installation_material_id, workId]
+    );
+    if (matCheck.rows.length === 0) { res.status(404).json({ error: 'Материал не найден' }); return; }
+    const mat = matCheck.rows[0];
+    const effectiveAvail = Number(mat.effective_available) || Number(mat.available_qty) || 0;
+    if (Number(mat.used_qty) + quantity > effectiveAvail) {
+      res.status(400).json({ error: `Использовано не может превысить поступление (${effectiveAvail})` }); return;
     }
 
     // Обновляем used_qty
@@ -570,6 +595,160 @@ router.get('/zone-counts', async (req: AuthRequest, res: Response) => {
     res.json(counts);
   } catch (err) {
     console.error('Zone counts error:', err);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// ============================================================================
+// POST /api/installation/works/:id/deliver-material — зафиксировать поступление материала
+// ============================================================================
+
+router.post('/works/:id/deliver-material', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const workId = req.params.id;
+    const { installation_material_id, quantity } = req.body;
+
+    if (!installation_material_id || !quantity || quantity <= 0) {
+      res.status(400).json({ error: 'installation_material_id и quantity обязательны' }); return;
+    }
+
+    // Поступление без ограничений (может превысить необходимое)
+    const result = await pool.query(
+      `UPDATE installation_materials SET available_qty = COALESCE(available_qty, 0) + $1
+       WHERE id = $2 AND work_id = $3 RETURNING *`,
+      [quantity, installation_material_id, workId]
+    );
+    if (result.rows.length === 0) { res.status(404).json({ error: 'Материал не найден' }); return; }
+
+    // Лог
+    await pool.query(
+      `INSERT INTO installation_log (work_id, action, details, created_by)
+       VALUES ($1, 'material_delivered', $2, $3)`,
+      [workId, JSON.stringify({ material_id: installation_material_id, quantity }), userId]
+    );
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Deliver material error:', err);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// ============================================================================
+// POST /api/installation/works/:id/adjust-required — откорректировать необходимое количество
+// ============================================================================
+
+router.post('/works/:id/adjust-required', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const workId = req.params.id;
+    const { installation_material_id, new_required_qty } = req.body;
+
+    if (!installation_material_id || new_required_qty === undefined) {
+      res.status(400).json({ error: 'installation_material_id и new_required_qty обязательны' }); return;
+    }
+
+    const result = await pool.query(
+      `UPDATE installation_materials SET required_qty = $1
+       WHERE id = $2 AND work_id = $3 RETURNING *`,
+      [new_required_qty, installation_material_id, workId]
+    );
+    if (result.rows.length === 0) { res.status(404).json({ error: 'Материал не найден' }); return; }
+
+    await pool.query(
+      `INSERT INTO installation_log (work_id, action, details, created_by)
+       VALUES ($1, 'required_adjusted', $2, $3)`,
+      [workId, JSON.stringify({ material_id: installation_material_id, new_required_qty }), userId]
+    );
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Adjust required error:', err);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// ============================================================================
+// Документы завершения (отдельные от файлов работы, с метками)
+// ============================================================================
+
+// GET /api/installation/works/:id/documents
+router.get('/works/:id/documents', async (req: AuthRequest, res: Response) => {
+  try {
+    const workId = req.params.id;
+    const result = await pool.query(
+      `SELECT d.*, u.last_name, u.first_name
+       FROM installation_documents d
+       LEFT JOIN users u ON u.id = d.created_by
+       WHERE d.work_id = $1 ORDER BY d.created_at DESC`,
+      [workId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Get documents error:', err);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// POST /api/installation/documents — загрузить документ завершения
+router.post('/documents', upload.single('file'), async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const file = req.file;
+    const workId = req.body.work_id;
+    const manualTag = req.body.manual_tag || null;
+    const notes = req.body.notes || null;
+
+    if (!file || !workId) { res.status(400).json({ error: 'file и work_id обязательны' }); return; }
+
+    const work = await pool.query('SELECT project_id FROM installation_works WHERE id = $1', [workId]);
+    if (work.rows.length === 0) { res.status(404).json({ error: 'Работа не найдена' }); return; }
+
+    const projectId = work.rows[0].project_id;
+    const ext = path.extname(fixFileName(file.originalname));
+    const storagePath = `${projectId}/installation/${workId}/docs/${uuidv4()}${ext}`;
+
+    await s3Client.send(new PutObjectCommand({
+      Bucket: MAIN_BUCKET, Key: storagePath, Body: file.buffer, ContentType: file.mimetype,
+    }));
+
+    const result = await pool.query(
+      `INSERT INTO installation_documents (work_id, file_name, storage_path, file_size, mime_type, manual_tag, notes, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [workId, fixFileName(file.originalname), storagePath, file.size, file.mimetype, manualTag, notes, userId]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error('Upload document error:', err);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// DELETE /api/installation/documents/:id
+router.delete('/documents/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    await pool.query('DELETE FROM installation_documents WHERE id = $1', [req.params.id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Delete document error:', err);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+// PUT /api/installation/documents/:id — обновить метку документа
+router.put('/documents/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const { manual_tag, notes } = req.body;
+    const result = await pool.query(
+      `UPDATE installation_documents SET manual_tag = $1, notes = $2 WHERE id = $3 RETURNING *`,
+      [manual_tag || null, notes || null, req.params.id]
+    );
+    if (result.rows.length === 0) { res.status(404).json({ error: 'Документ не найден' }); return; }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Update document error:', err);
     res.status(500).json({ error: 'Ошибка сервера' });
   }
 });
