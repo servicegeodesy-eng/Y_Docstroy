@@ -82,6 +82,8 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
   const [files, setFiles] = useState<File[]>([]);
   const [notes, setNotes] = useState("");
   const [manualTag, setManualTag] = useState("");
+  const [showDescription, setShowDescription] = useState(false);
+  const [showTag, setShowTag] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -467,17 +469,39 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
             </div>
           </Section>
 
-          {/* === Метка === */}
-          <Section title="Метка">
-            <input className="ds-input w-full text-sm" placeholder="Метка (например: этап 1, срочное...)"
-              value={manualTag} onChange={e => setManualTag(e.target.value)} />
-          </Section>
-
-          {/* === Описание === */}
-          <Section title="Описание">
-            <textarea className="ds-input w-full text-sm" rows={3} placeholder="Описание работы..."
-              value={notes} onChange={e => setNotes(e.target.value)} />
-          </Section>
+          {/* === Описание + Метка — значки по аналогии с реестром === */}
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => setShowDescription(!showDescription)}
+                className="flex items-center gap-1.5 text-xs transition-colors"
+                style={{ color: showDescription || notes ? "var(--ds-accent)" : "var(--ds-text-faint)" }}
+                title="Добавить описание">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+                </svg>
+                {notes ? "Описание \u2713" : "Описание"}
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => setShowTag(!showTag)}
+                className="flex items-center gap-1.5 text-xs transition-colors"
+                style={{ color: showTag || manualTag ? "var(--ds-accent)" : "var(--ds-text-faint)" }}
+                title="Добавить метку">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5a1.99 1.99 0 011.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.99 1.99 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+                {manualTag ? manualTag : "Метка"}
+              </button>
+              {showTag && (
+                <input type="text" value={manualTag} onChange={e => setManualTag(e.target.value)}
+                  className="ds-input !py-1 text-sm !w-36" placeholder="Добавить метку" autoFocus />
+              )}
+            </div>
+          </div>
+          {showDescription && (
+            <textarea rows={3} value={notes} onChange={e => setNotes(e.target.value)}
+              className="ds-input w-full resize-none text-sm" placeholder="Описание работы (необязательно)" autoFocus />
+          )}
 
           {error && <p className="text-sm text-red-500 font-medium">{error}</p>}
         </div>
