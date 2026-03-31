@@ -11,7 +11,7 @@ const leadLimiter = rateLimit({
   message: { error: 'Слишком много заявок. Попробуйте через час.' },
 });
 
-const VALID_PLANS = ['start', 'standard', 'business', 'corporation'] as const;
+const VALID_PLANS = ['trial', 'start', 'standard', 'business', 'corporation'] as const;
 
 router.post('/', leadLimiter, async (req: Request, res: Response) => {
   try {

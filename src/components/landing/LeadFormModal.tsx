@@ -5,6 +5,7 @@ import type { PlanKey } from "./PricingSection";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 const PLAN_LABELS: Record<PlanKey, string> = {
+  trial: "Пробный",
   start: "Старт",
   standard: "Стандарт",
   business: "Бизнес",

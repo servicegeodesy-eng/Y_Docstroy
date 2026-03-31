@@ -3,7 +3,7 @@
 
 CREATE TABLE IF NOT EXISTS leads (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  plan_key      TEXT NOT NULL,               -- 'start' | 'standard' | 'business' | 'corporation'
+  plan_key      TEXT NOT NULL,               -- 'trial' | 'start' | 'standard' | 'business' | 'corporation'
   company_name  TEXT NOT NULL,
   inn           TEXT,
   contact_name  TEXT NOT NULL,

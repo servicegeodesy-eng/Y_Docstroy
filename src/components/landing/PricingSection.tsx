@@ -1,10 +1,20 @@
 const PLANS = [
   {
+    key: "trial",
+    name: "Пробный",
+    price: "0",
+    objects: 1,
+    users: 5,
+    storage: "10 ГБ",
+    popular: false,
+  },
+  {
     key: "start",
     name: "Старт",
     price: "50 000",
     objects: 1,
     users: 25,
+    storage: "50 ГБ",
     popular: false,
   },
   {
@@ -13,6 +23,7 @@ const PLANS = [
     price: "200 000",
     objects: 5,
     users: 150,
+    storage: "500 ГБ",
     popular: true,
   },
   {
@@ -21,6 +32,7 @@ const PLANS = [
     price: "300 000",
     objects: 10,
     users: 400,
+    storage: "1 ТБ",
     popular: false,
   },
   {
@@ -29,6 +41,7 @@ const PLANS = [
     price: "500 000",
     objects: 20,
     users: 1000,
+    storage: "5 ТБ",
     popular: false,
   },
 ] as const;
@@ -53,7 +66,7 @@ export default function PricingSection({ onSelectPlan }: Props) {
           Выберите подходящий тариф для вашей компании
         </p>
 
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-5">
           {PLANS.map((plan) => (
             <PlanCard key={plan.key} plan={plan} onSelect={() => onSelectPlan(plan.key)} />
           ))}
@@ -70,6 +83,7 @@ export default function PricingSection({ onSelectPlan }: Props) {
           <div className="flex flex-col sm:flex-row justify-center gap-4 sm:gap-8 text-sm" style={{ color: "var(--ds-text-muted)" }}>
             <span>+10 пользователей на объект — <b style={{ color: "var(--ds-text)" }}>10 000 руб/мес</b></span>
             <span>+1 объект — <b style={{ color: "var(--ds-text)" }}>40 000 руб/мес</b></span>
+            <span>+50 ГБ хранилища — <b style={{ color: "var(--ds-text)" }}>10 000 руб/мес</b></span>
           </div>
         </div>
 
@@ -113,10 +127,16 @@ function PlanCard({
         {plan.name}
       </h3>
       <div className="mb-4">
-        <span className="text-2xl font-bold" style={{ color: "var(--ds-accent)" }}>
-          {plan.price}
-        </span>
-        <span className="text-sm ml-1" style={{ color: "var(--ds-text-muted)" }}>руб/мес</span>
+        {plan.price === "0" ? (
+          <span className="text-2xl font-bold" style={{ color: "var(--ds-accent)" }}>Бесплатно</span>
+        ) : (
+          <>
+            <span className="text-2xl font-bold" style={{ color: "var(--ds-accent)" }}>
+              {plan.price}
+            </span>
+            <span className="text-sm ml-1" style={{ color: "var(--ds-text-muted)" }}>руб/мес</span>
+          </>
+        )}
       </div>
 
       <ul className="flex-1 space-y-2 mb-5 text-sm" style={{ color: "var(--ds-text-muted)" }}>
@@ -127,6 +147,10 @@ function PlanCard({
         <li className="flex items-start gap-2">
           <CheckIcon />
           <span>До <b style={{ color: "var(--ds-text)" }}>{plan.users}</b> пользователей</span>
+        </li>
+        <li className="flex items-start gap-2">
+          <CheckIcon />
+          <span>Хранилище <b style={{ color: "var(--ds-text)" }}>{plan.storage}</b></span>
         </li>
       </ul>
 
