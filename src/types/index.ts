@@ -251,7 +251,7 @@ export interface Overlay {
   width: number | null;
   height: number | null;
   sort_order: number;
-  tab_type: 'plan' | 'facades' | 'landscaping' | null;
+  tab_type: 'plan' | 'facades' | 'landscaping' | 'roof' | 'floors' | 'walls' | 'frame' | 'territory' | 'earthwork' | 'foundation' | 'shoring' | 'piles' | null;
   created_at: string;
 }
 
