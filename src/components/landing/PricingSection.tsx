@@ -88,6 +88,38 @@ export default function PricingSection({ onSelectPlan }: Props) {
           </div>
         </div>
 
+        {/* Включено в тариф */}
+        <div
+          className="mt-8 rounded-xl p-5"
+          style={{ background: "var(--ds-surface)", border: "1px solid var(--ds-border)" }}
+        >
+          <h3 className="font-semibold mb-3" style={{ color: "var(--ds-text)" }}>
+            Включено во все тарифы
+          </h3>
+          <div className="space-y-2 text-sm" style={{ color: "var(--ds-text-muted)" }}>
+            <div className="flex items-start gap-2">
+              <CheckIcon />
+              <span>Обучение администраторов проектов и компаний функциям администрирования</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Дополнительные услуги */}
+        <div
+          className="mt-4 rounded-xl p-5"
+          style={{ background: "var(--ds-surface)", border: "1px solid var(--ds-border)" }}
+        >
+          <h3 className="font-semibold mb-3" style={{ color: "var(--ds-text)" }}>
+            Дополнительно
+          </h3>
+          <div className="text-sm" style={{ color: "var(--ds-text-muted)" }}>
+            <p>
+              Полное техническое сопровождение проекта — расценка определяется индивидуально
+              в зависимости от площади объекта, количества корпусов и других характеристик объекта строительства.
+            </p>
+          </div>
+        </div>
+
         {/* Общие условия */}
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <ConditionItem text="Настройка проекта по рабочей документации за 7 рабочих дней" />
