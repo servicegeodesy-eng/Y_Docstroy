@@ -38,11 +38,13 @@ export default function WorkDetailModal({ workId, onClose, onUpdated }: Props) {
   const [deliveryMat, setDeliveryMat] = useState<string | null>(null);
   const [deliveryQty, setDeliveryQty] = useState("");
   const [deliveryFiles, setDeliveryFiles] = useState<File[]>([]);
+  const [deliveryError, setDeliveryError] = useState<string | null>(null);
 
   // Фиксация процесса
   const [usageMat, setUsageMat] = useState<string | null>(null);
   const [usageQty, setUsageQty] = useState("");
   const [usageFiles, setUsageFiles] = useState<File[]>([]);
+  const [usageError, setUsageError] = useState<string | null>(null);
 
   // Завершение
   const [showComplete, setShowComplete] = useState(false);
@@ -131,7 +133,6 @@ export default function WorkDetailModal({ workId, onClose, onUpdated }: Props) {
   }
 
   // Фиксация поступления
-  const [deliveryError, setDeliveryError] = useState<string | null>(null);
   async function handleDelivery(matId: string) {
     const qty = Number(deliveryQty) || 0;
     if (qty <= 0) return;
@@ -150,7 +151,6 @@ export default function WorkDetailModal({ workId, onClose, onUpdated }: Props) {
   }
 
   // Фиксация процесса (использование)
-  const [usageError, setUsageError] = useState<string | null>(null);
   async function handleUseMaterial(matId: string) {
     const qty = Number(usageQty) || 0;
     if (qty <= 0) return;
