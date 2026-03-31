@@ -6,7 +6,6 @@ import { useDictLinks, filterChildren, compositeKey, hasLinkedChildren, isChildL
 import { useMobile } from "@/lib/MobileContext";
 import { useOverlays } from "@/hooks/useOverlays";
 import { getOverlayUrl } from "@/lib/overlayUrlCache";
-import CreateOrderModal from "@/components/materials/CreateOrderModal";
 import PolygonDrawer from "@/components/plan/PolygonDrawer";
 import type { Point } from "@/components/plan/SnapEngine";
 import { useCellMasks } from "@/hooks/useCellMasks";
@@ -20,11 +19,6 @@ interface MaterialRow {
   key: number; material_name: string; material_id: string | null;
   unit_id: string; unit_name: string; required_qty: string;
 }
-interface AvailableOrder {
-  order_item_id: string; material_name: string; unit_short: string;
-  order_id: string; order_number: string; available_qty: number;
-}
-interface SelectedOrder { order_item_id: string; qty: string }
 interface Props { onClose: () => void; onCreated: () => void }
 
 let rowKey = 0;
@@ -83,11 +77,6 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
   const [nOpen, setNOpen] = useState<number | null>(null);
   const [uOpen, setUOpen] = useState<number | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Orders selection
-  const [availableOrders, setAvailableOrders] = useState<AvailableOrder[]>([]);
-  const [selectedOrders, setSelectedOrders] = useState<Record<string, SelectedOrder>>({});
-  const [showOrderModal, setShowOrderModal] = useState(false);
 
   // Files, notes, submit
   const [files, setFiles] = useState<File[]>([]);
@@ -149,15 +138,6 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
     setDrawnPolygons([]);
   }, [selBuilding, selWorkType, overlays, workTypeOverlays, overlayBuildings]);
 
-  // Load available orders when items change
-  useEffect(() => {
-    if (!project) return;
-    const validNames = items.filter(it => it.material_name).map(it => it.material_name.toLowerCase());
-    if (validNames.length === 0) { setAvailableOrders([]); return; }
-    api.get<AvailableOrder[]>("/api/installation/available-materials", { project_id: project.id })
-      .then((r) => { if (r.data) setAvailableOrders(r.data); });
-  }, [project, items]);
-
   // Nomenclature search
   const searchNomenclature = useCallback((key: number, q: string) => {
     if (searchTimer.current) clearTimeout(searchTimer.current);
@@ -215,47 +195,23 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
 
   const validItems = items.filter(it => it.material_name && it.required_qty && Number(it.required_qty) > 0);
 
-  const getOrdersForMaterial = (name: string) =>
-    availableOrders.filter(ao => ao.material_name.toLowerCase() === name.toLowerCase());
-
-  const toggleOrder = (orderItemId: string, availQty: number) => {
-    setSelectedOrders(prev => {
-      if (prev[orderItemId]) { const n = { ...prev }; delete n[orderItemId]; return n; }
-      return { ...prev, [orderItemId]: { order_item_id: orderItemId, qty: String(availQty) } };
-    });
-  };
-
-  const updateOrderQty = (id: string, qty: string) => {
-    setSelectedOrders(prev => ({ ...prev, [id]: { ...prev[id], qty } }));
-  };
-
-  // Validation: total selected per material must equal required
-  const getMaterialBalance = (mat: MaterialRow) => {
-    const required = Number(mat.required_qty) || 0;
-    const orders = getOrdersForMaterial(mat.material_name);
-    let selected = 0;
-    for (const o of orders) {
-      if (selectedOrders[o.order_item_id]) selected += Number(selectedOrders[o.order_item_id].qty) || 0;
-    }
-    return { required, selected, balanced: selected === required };
-  };
-
-  const allBalanced = validItems.length > 0 && validItems.every(it => getMaterialBalance(it).balanced);
-
-  const canSubmit = allBalanced && (!linkedOverlay || drawnPolygons.length > 0);
+  const canSubmit = validItems.length > 0 && (!linkedOverlay || drawnPolygons.length > 0);
 
   const handleSubmit = async () => {
     if (!project) return;
     if (linkedOverlay && drawnPolygons.length === 0) { setError("Необходимо отметить область на подложке"); return; }
     if (validItems.length === 0) { setError("Добавьте материалы"); return; }
-    if (!allBalanced) { setError("Количество выбранных материалов должно совпадать с необходимым"); return; }
 
     setLoading(true);
     setError(null);
 
-    const materials = Object.values(selectedOrders)
-      .filter(so => Number(so.qty) > 0)
-      .map(so => ({ order_item_id: so.order_item_id, required_qty: Number(so.qty) }));
+    const materials = validItems.map(it => ({
+      material_name: it.material_name,
+      material_id: it.material_id,
+      unit_id: it.unit_id || null,
+      unit_name: it.unit_name,
+      required_qty: Number(it.required_qty),
+    }));
 
     const res = await api.post("/api/installation/works", {
       project_id: project.id,
@@ -356,7 +312,6 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
           if (!selWorkType) warnings.push("Выберите вид работ");
           if (linkedOverlay && drawnPolygons.length === 0) warnings.push("Отметьте область на подложке");
           if (validItems.length === 0) warnings.push("Укажите необходимые материалы");
-          if (validItems.length > 0 && !allBalanced) warnings.push("Выберите заявки для всех материалов (количество должно совпадать)");
           if (warnings.length === 0) return null;
           return (
             <div className="px-6 py-2 text-xs space-y-0.5" style={{ background: "color-mix(in srgb, #f59e0b 10%, var(--ds-surface))", borderBottom: "1px solid var(--ds-border)" }}>
@@ -490,43 +445,6 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
             <button onClick={() => setItems(p => [...p, emptyRow()])} className="ds-btn-secondary text-xs px-3 py-1.5">+ Добавить материал</button>
           </Section>
 
-          {/* === Выбор заявок === */}
-          {validItems.length > 0 && (
-            <Section title="Выбор заявок">
-              {validItems.map(mat => {
-                const orders = getOrdersForMaterial(mat.material_name);
-                const { required, selected, balanced } = getMaterialBalance(mat);
-                return (
-                  <div key={mat.key} className="mb-4 p-3 rounded-lg" style={{ background: "var(--ds-surface-sunken)" }}>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium" style={{ color: "var(--ds-text)" }}>{mat.material_name}</span>
-                      <span className="text-xs" style={{ color: balanced ? "#22c55e" : "#ef4444" }}>
-                        {selected}/{required} {mat.unit_name} {balanced ? "✓" : "✗"}
-                      </span>
-                    </div>
-                    {orders.length > 0 ? orders.map(o => (
-                      <div key={o.order_item_id} className="flex items-center gap-2 mb-1">
-                        <input type="checkbox" checked={!!selectedOrders[o.order_item_id]}
-                          onChange={() => toggleOrder(o.order_item_id, Math.min(o.available_qty, required - selected + (Number(selectedOrders[o.order_item_id]?.qty) || 0)))} />
-                        <span className="text-xs flex-1" style={{ color: "var(--ds-text-muted)" }}>
-                          Заявка №{o.order_number} (доступно: {o.available_qty} {o.unit_short})
-                        </span>
-                        {selectedOrders[o.order_item_id] && (
-                          <input className="ds-input w-16 text-xs text-center" type="number" min="0"
-                            max={o.available_qty}
-                            value={selectedOrders[o.order_item_id].qty}
-                            onChange={e => updateOrderQty(o.order_item_id, e.target.value)} />
-                        )}
-                      </div>
-                    )) : (
-                      <p className="text-xs" style={{ color: "var(--ds-text-faint)" }}>Нет заявок с этим материалом</p>
-                    )}
-                    <button onClick={() => setShowOrderModal(true)} className="ds-btn-secondary text-xs px-2 py-1 mt-1">Заказать ещё</button>
-                  </div>
-                );
-              })}
-            </Section>
-          )}
 
           {/* === Файлы === */}
           <Section title="Файлы">
@@ -565,31 +483,6 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
         </div>
       </div>
 
-      {/* Nested order modal */}
-      {showOrderModal && (
-        <CreateOrderModal
-          onClose={() => setShowOrderModal(false)}
-          prefill={{
-            building_id: selBuilding || undefined,
-            work_type_id: selWorkType || undefined,
-            floor_id: selFloor || undefined,
-            construction_id: selConstruction || undefined,
-            items: validItems.map(it => ({
-              material_name: it.material_name,
-              unit_id: it.unit_id,
-              unit_name: it.unit_name,
-              quantity: it.required_qty,
-            })),
-          }}
-          onCreated={() => {
-            setShowOrderModal(false);
-            if (project) {
-              api.get<AvailableOrder[]>("/api/installation/available-materials", { project_id: project.id })
-                .then(r => { if (r.data) setAvailableOrders(r.data); });
-            }
-          }}
-        />
-      )}
     </div>
   );
 }

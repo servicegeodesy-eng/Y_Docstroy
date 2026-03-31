@@ -1,592 +1,438 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { api } from "@/lib/api";
 import { useProject } from "@/lib/ProjectContext";
 import { useMobile } from "@/lib/MobileContext";
-import OrderCard from "@/components/materials/OrderCard";
-import CreateOrderModal from "@/components/materials/CreateOrderModal";
-import DeliveryModal from "@/components/materials/DeliveryModal";
-import OrderDetailOverlay from "@/components/materials/OrderDetailOverlay";
-import MaterialFilters from "@/components/materials/MaterialFilters";
-import type { MaterialFilterKey } from "@/components/materials/MaterialFilters";
-import type { MaterialOrder } from "@/components/materials/OrderCard";
+import WorkMaskPreview from "@/components/installation/WorkMaskPreview";
 
-type Tab = "ordered" | "remaining" | "drafts";
-
-interface RemainingItem {
+interface WorkMaterial {
+  id: string;
   material_name: string;
-  unit_name: string;
-  remaining: number;
+  unit_short: string;
+  required_qty: number;
+  used_qty: number;
+  available_qty: number;
 }
 
-interface RemainingGroup {
+interface MaterialWork {
+  id: string;
+  status: "planned" | "in_progress" | "completed";
   building_name: string;
   work_type_name: string;
   floor_name: string | null;
   construction_name: string | null;
-  items: RemainingItem[];
+  planned_date: string;
+  started_at: string | null;
+  completed_at: string | null;
+  notes: string | null;
+  completion_comment: string | null;
+  materials: WorkMaterial[];
 }
 
-const emptyFilters = (): Record<MaterialFilterKey, Set<string>> => ({
-  building: new Set(), workType: new Set(), floor: new Set(), construction: new Set(),
-});
+interface Disposition {
+  material_id: string;
+  name: string;
+  unit: string;
+  unused: number;
+  action: "returned" | "scrap";
+  qty: string;
+  notes: string;
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  planned: "Запланировано",
+  in_progress: "В процессе",
+  completed: "Завершено",
+};
+const STATUS_COLORS: Record<string, string> = {
+  planned: "#3b82f6",
+  in_progress: "#f59e0b",
+  completed: "#22c55e",
+};
 
 export default function MaterialsPage() {
-  const { project, isProjectAdmin: isAdmin, isPortalAdmin } = useProject();
+  const { project } = useProject();
   const { isMobile } = useMobile();
-  const [activeTab, setActiveTab] = useState<Tab>("ordered");
-  const [showAllOrders, setShowAllOrders] = useState(false);
-
-  // Data
-  const [orders, setOrders] = useState<MaterialOrder[]>([]);
-  const [remaining, setRemaining] = useState<RemainingGroup[]>([]);
+  const [works, setWorks] = useState<MaterialWork[]>([]);
   const [loading, setLoading] = useState(false);
-  const canAdmin = isAdmin || isPortalAdmin;
+  const [showArchive, setShowArchive] = useState(false);
+  const [expandedWork, setExpandedWork] = useState<string | null>(null);
 
-  // Filters
-  const [showFilters, setShowFilters] = useState(false);
-  const [filters, setFilters] = useState<Record<MaterialFilterKey, Set<string>>>(emptyFilters);
-  const [openFilter, setOpenFilter] = useState<MaterialFilterKey | null>(null);
-  const filterRef = useRef<HTMLDivElement>(null);
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [search, setSearch] = useState("");
-  const [showSearch, setShowSearch] = useState(false);
-
-  // Modals
-  const [showCreate, setShowCreate] = useState(false);
-  const [editOrder, setEditOrder] = useState<MaterialOrder | null>(null);
-  const [detailOrder, setDetailOrder] = useState<MaterialOrder | null>(null);
-  const [deliveryOrder, setDeliveryOrder] = useState<MaterialOrder | null>(null);
-
-  // Close dropdown on outside click
-  useEffect(() => {
-    if (!openFilter) return;
-    const handler = (e: MouseEvent) => {
-      if (filterRef.current && !filterRef.current.contains(e.target as Node)) setOpenFilter(null);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [openFilter]);
-
-  const loadOrders = useCallback(async () => {
+  const loadWorks = useCallback(async () => {
     if (!project) return;
     setLoading(true);
-    const params: Record<string, string> = { project_id: project.id };
-    if (!showAllOrders) params.my = "true";
-    const res = await api.get<Record<string, unknown>[]>("/api/materials/orders", params);
+    const res = await api.get<MaterialWork[]>("/api/installation/works", { project_id: project.id });
     if (res.data) {
-      // Маппинг API → фронтенд типы
-      const mapped: MaterialOrder[] = res.data.map((o: Record<string, unknown>) => ({
-        id: o.id as string,
-        order_number: String(o.order_number || ""),
-        status: (o.status || "draft") as MaterialOrder["status"],
-        building_name: (o.building_name || "") as string,
-        work_type_name: (o.work_type_name || "") as string,
-        floor_name: (o.floor_name || null) as string | null,
-        construction_name: (o.construction_name || null) as string | null,
-        notes: (o.notes || null) as string | null,
-        created_at: (o.created_at || "") as string,
-        created_by_name: [o.last_name, o.first_name].filter(Boolean).join(" ") || "",
-        items: Array.isArray(o.items) ? (o.items as Record<string, unknown>[]).map((it) => ({
-          id: (it.id || "") as string,
-          material_name: (it.material_name || "") as string,
-          unit_name: (it.unit_short || it.unit_name || "") as string,
-          quantity: Number(it.quantity || 0),
-          delivered_quantity: Number(it.delivered_qty ?? it.delivered_quantity ?? 0),
-        })) : [],
-      }));
-      setOrders(mapped);
-    }
-    setLoading(false);
-  }, [project, showAllOrders]);
-
-  const loadRemaining = useCallback(async () => {
-    if (!project) return;
-    setLoading(true);
-    interface RawRow { building_name: string; work_type_name: string; floor_name: string | null; construction_name: string | null; material_name: string; unit_short: string; remaining: number }
-    const res = await api.get<RawRow[]>("/api/materials/remaining", {
-      project_id: project.id,
-    });
-    if (res.data) {
-      // Группировка по локации
-      const map = new Map<string, RemainingGroup>();
-      for (const row of res.data) {
-        const key = [row.building_name, row.work_type_name, row.floor_name, row.construction_name].join("|");
-        if (!map.has(key)) {
-          map.set(key, {
-            building_name: row.building_name,
-            work_type_name: row.work_type_name,
-            floor_name: row.floor_name,
-            construction_name: row.construction_name,
-            items: [],
-          });
-        }
-        map.get(key)!.items.push({
-          material_name: row.material_name,
-          unit_name: row.unit_short || "",
-          remaining: Number(row.remaining) || 0,
-        });
-      }
-      setRemaining(Array.from(map.values()));
+      setWorks(res.data.map(w => ({
+        ...w,
+        materials: ((w.materials || []) as unknown as Record<string, unknown>[]).map(m => ({
+          id: m.id as string,
+          material_name: (m.material_name || "") as string,
+          unit_short: (m.unit_short || "") as string,
+          required_qty: Number(m.required_qty) || 0,
+          used_qty: Number(m.used_qty) || 0,
+          available_qty: Number(m.available_qty) || 0,
+        })),
+      })));
     }
     setLoading(false);
   }, [project]);
 
-  useEffect(() => {
-    if (activeTab === "remaining") {
-      loadRemaining();
-    } else {
-      loadOrders();
-    }
-  }, [activeTab, loadOrders, loadRemaining]);
-
-  // Filter options computed from loaded orders
-  const filterOptions = useMemo<Record<MaterialFilterKey, string[]>>(() => {
-    const sets: Record<MaterialFilterKey, Set<string>> = { building: new Set(), workType: new Set(), floor: new Set(), construction: new Set() };
-    for (const o of orders) {
-      if (o.building_name) sets.building.add(o.building_name);
-      if (o.work_type_name) sets.workType.add(o.work_type_name);
-      if (o.floor_name) sets.floor.add(o.floor_name);
-      if (o.construction_name) sets.construction.add(o.construction_name);
-    }
-    return { building: [...sets.building].sort(), workType: [...sets.workType].sort(), floor: [...sets.floor].sort(), construction: [...sets.construction].sort() };
-  }, [orders]);
-
-  const toggleFilterValue = useCallback((key: MaterialFilterKey, value: string) => {
-    setFilters((prev) => {
-      const s = new Set(prev[key]);
-      if (s.has(value)) s.delete(value); else s.add(value);
-      return { ...prev, [key]: s };
-    });
-  }, []);
-
-  const activeFilterCount = useMemo(() => {
-    let c = 0;
-    for (const k of Object.keys(filters) as MaterialFilterKey[]) c += filters[k].size;
-    if (dateFrom) c++;
-    if (dateTo) c++;
-    if (search) c++;
-    if (showAllOrders) c++;
-    return c;
-  }, [filters, dateFrom, dateTo, search, showAllOrders]);
-
-  const hasActiveFilters = activeFilterCount > 0;
-
-  const clearFilters = useCallback(() => {
-    setFilters(emptyFilters());
-    setDateFrom("");
-    setDateTo("");
-    setSearch("");
-    setShowAllOrders(false);
-  }, []);
-
-  // Client-side filtering
-  const applyFilters = useCallback((list: MaterialOrder[]) => {
-    return list.filter((o) => {
-      if (filters.building.size > 0 && !filters.building.has(o.building_name)) return false;
-      if (filters.workType.size > 0 && !filters.workType.has(o.work_type_name)) return false;
-      if (filters.floor.size > 0 && !(o.floor_name && filters.floor.has(o.floor_name))) return false;
-      if (filters.construction.size > 0 && !(o.construction_name && filters.construction.has(o.construction_name))) return false;
-      if (dateFrom && o.created_at < dateFrom) return false;
-      if (dateTo && o.created_at.slice(0, 10) > dateTo) return false;
-      if (search) {
-        const q = search.toLowerCase();
-        const haystack = [o.order_number, o.notes || ""].join(" ").toLowerCase();
-        if (!haystack.includes(q)) return false;
-      }
-      return true;
-    });
-  }, [filters, dateFrom, dateTo, search]);
+  useEffect(() => { loadWorks(); }, [loadWorks]);
 
   if (!project) return null;
 
-  const activeOrdersRaw = orders.filter((o) => o.status === "ordered" || o.status === "partial");
-  const archivedOrdersRaw = orders.filter((o) => o.status === "delivered");
-  const draftListRaw = orders.filter((o) => o.status === "draft");
-  const orderedList = applyFilters(activeOrdersRaw);
-  const archivedList = applyFilters(archivedOrdersRaw);
-  const draftList = applyFilters(draftListRaw);
-  const totalCount = activeTab === "drafts" ? draftListRaw.length : activeOrdersRaw.length;
-  const filteredCount = activeTab === "drafts" ? draftList.length : orderedList.length;
-
-  const handleCreated = () => {
-    setShowCreate(false);
-    setEditOrder(null);
-    loadOrders();
-  };
-
-  const handleDeliverySaved = () => {
-    setDeliveryOrder(null);
-    setDetailOrder(null);
-    loadOrders();
-  };
-
-  const handleDelete = async (order: MaterialOrder) => {
-    const msg = order.status === "draft" ? "Удалить черновик?" : "Удалить заказ?";
-    if (!confirm(msg)) return;
-    await api.delete(`/api/materials/orders/${order.id}`);
-    loadOrders();
-  };
-
-  const handleSubmitDraft = async (order: MaterialOrder) => {
-    await api.patch(`/api/materials/orders/${order.id}`, { status: "ordered" });
-    loadOrders();
-  };
-
-  const tabs: { key: Tab; label: string; count?: number }[] = [
-    { key: "ordered", label: "Заказано", count: orderedList.length || undefined },
-    { key: "remaining", label: "Остатки" },
-    { key: "drafts", label: "Черновики", count: draftList.length },
-  ];
+  // Фильтруем работы с материалами
+  const worksWithMaterials = works.filter(w => (w.materials || []).length > 0);
+  const activeWorks = worksWithMaterials.filter(w => w.status !== "completed");
+  const completedWorks = worksWithMaterials.filter(w => w.status === "completed");
 
   return (
     <div>
       {/* Header */}
       <div className={`flex items-center justify-between ${isMobile ? "mb-3" : "mb-6"}`}>
-        <div className="flex items-center gap-2">
-          <h2 className={`font-semibold ${isMobile ? "text-lg" : "text-xl"}`} style={{ color: "var(--ds-text)" }}>
-            Материалы
-          </h2>
-          <button
-            onClick={() => setShowFilters((v) => !v)}
-            className="ds-icon-btn relative"
-            style={showFilters || hasActiveFilters ? { color: "var(--ds-accent)", background: "color-mix(in srgb, var(--ds-accent) 10%, var(--ds-surface))" } : undefined}
-            title="Фильтры"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-            </svg>
-            {hasActiveFilters && <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500" />}
-          </button>
-        </div>
-        <button className="ds-btn text-sm flex items-center gap-1.5" onClick={() => setShowCreate(true)}>
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          {!isMobile && "Заказать"}
-        </button>
+        <h2 className={`font-semibold ${isMobile ? "text-lg" : "text-xl"}`} style={{ color: "var(--ds-text)" }}>
+          Материалы
+        </h2>
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-3 mb-4 flex-wrap">
-        <div className="flex gap-1 rounded-lg p-1 w-fit" style={{ background: "var(--ds-surface-sunken)" }}>
-          {tabs.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className="px-4 py-2 text-sm font-medium rounded-md transition-colors flex items-center gap-1.5"
-              style={activeTab === tab.key
-                ? { background: "var(--ds-surface)", color: "var(--ds-text)", boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }
-                : { color: "var(--ds-text-faint)" }}
-            >
-              {tab.label}
-              {tab.count !== undefined && tab.count > 0 && (
-                <span
-                  className="text-xs px-1.5 py-0.5 rounded-full"
-                  style={{
-                    background: activeTab === tab.key
-                      ? "color-mix(in srgb, var(--ds-accent) 15%, transparent)"
-                      : "color-mix(in srgb, var(--ds-text-faint) 15%, transparent)",
-                    color: activeTab === tab.key ? "var(--ds-accent)" : "var(--ds-text-faint)",
-                  }}
-                >
-                  {tab.count}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-
-      </div>
-
-      {/* Фильтры */}
-      {showFilters && (activeTab === "ordered" || activeTab === "drafts") && (
-        <MaterialFilters
-          filters={filters} setFilters={setFilters} filterOptions={filterOptions}
-          openFilter={openFilter} setOpenFilter={setOpenFilter} filterRef={filterRef}
-          dateFrom={dateFrom} setDateFrom={setDateFrom} dateTo={dateTo} setDateTo={setDateTo}
-          search={search} setSearch={setSearch} showSearch={showSearch} setShowSearch={setShowSearch}
-          hasActiveFilters={hasActiveFilters} activeFilterCount={activeFilterCount}
-          filteredCount={filteredCount} totalCount={totalCount}
-          clearFilters={clearFilters} toggleFilterValue={toggleFilterValue}
-          allOrders={showAllOrders} setAllOrders={setShowAllOrders} showAllToggle
-        />
-      )}
-
-      {/* Content */}
       {loading ? (
         <div className="ds-card p-8 text-center">
           <div className="inline-block w-6 h-6 border-2 border-current border-t-transparent rounded-full animate-spin mb-2" style={{ color: "var(--ds-accent)" }} />
           <p className="text-sm" style={{ color: "var(--ds-text-faint)" }}>Загрузка...</p>
         </div>
-      ) : activeTab === "ordered" ? (
-        <OrderedTab
-          orders={orderedList}
-          archivedOrders={archivedList}
-          onClickOrder={setDetailOrder}
-          canAdmin={canAdmin}
-          onEdit={(o) => { setEditOrder(o); setShowCreate(true); }}
-          onDelete={handleDelete}
-        />
-      ) : activeTab === "remaining" ? (
-        <RemainingTab groups={remaining} />
+      ) : worksWithMaterials.length === 0 ? (
+        <div className="ds-card p-8 text-center">
+          <svg className="w-12 h-12 mx-auto mb-3" style={{ color: "var(--ds-text-faint)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+          </svg>
+          <p className="font-medium mb-1" style={{ color: "var(--ds-text)" }}>Нет данных по материалам</p>
+          <p className="text-sm" style={{ color: "var(--ds-text-faint)" }}>Материалы появятся после создания работ с указанием материалов</p>
+        </div>
       ) : (
-        <DraftsTab
-          orders={draftList}
-          onClickOrder={setDetailOrder}
-          onEdit={(o) => { setEditOrder(o); setShowCreate(true); }}
-          onDelete={handleDelete}
-          onSubmit={handleSubmitDraft}
-        />
-      )}
+        <>
+          {/* Активные работы */}
+          <div className="space-y-3">
+            {activeWorks.map(work => (
+              <MaterialWorkCard
+                key={work.id}
+                work={work}
+                expanded={expandedWork === work.id}
+                onToggle={() => setExpandedWork(expandedWork === work.id ? null : work.id)}
+                onUpdated={loadWorks}
+                isMobile={isMobile}
+              />
+            ))}
+          </div>
 
-      {/* Detail overlay for ordered items */}
-      {detailOrder && !deliveryOrder && (
-        <OrderDetailOverlay
-          order={detailOrder}
-          onClose={() => setDetailOrder(null)}
-          onDelivery={() => setDeliveryOrder(detailOrder)}
-          isMobile={isMobile}
-        />
-      )}
+          {activeWorks.length === 0 && completedWorks.length > 0 && (
+            <div className="ds-card p-6 text-center mb-3">
+              <p className="text-sm" style={{ color: "var(--ds-text-faint)" }}>Нет активных работ с материалами</p>
+            </div>
+          )}
 
-      {/* Modals */}
-      {showCreate && (
-        <CreateOrderModal
-          onClose={() => { setShowCreate(false); setEditOrder(null); }}
-          onCreated={handleCreated}
-          editOrder={editOrder}
-        />
-      )}
-      {deliveryOrder && (
-        <DeliveryModal
-          order={deliveryOrder}
-          onClose={() => setDeliveryOrder(null)}
-          onSaved={handleDeliverySaved}
-        />
+          {/* Архив */}
+          {completedWorks.length > 0 && (
+            <div className="mt-4">
+              <button
+                onClick={() => setShowArchive(!showArchive)}
+                className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5"
+                style={{ color: "var(--ds-text-faint)" }}
+              >
+                <svg className={`w-3 h-3 transition-transform ${showArchive ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+                Завершённые ({completedWorks.length})
+              </button>
+              {showArchive && (
+                <div className="space-y-3 mt-2">
+                  {completedWorks.map(work => (
+                    <MaterialWorkCard
+                      key={work.id}
+                      work={work}
+                      expanded={expandedWork === work.id}
+                      onToggle={() => setExpandedWork(expandedWork === work.id ? null : work.id)}
+                      onUpdated={loadWorks}
+                      isMobile={isMobile}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
 }
 
-/* === Sub-components === */
-const STATUS_LABELS: Record<string, string> = { ordered: "Ожидают поступления", partial: "Частично", delivered: "Доставлено", draft: "Черновик" };
-const STATUS_COLORS: Record<string, string> = { ordered: "#3b82f6", partial: "#f59e0b", delivered: "#22c55e", draft: "var(--ds-text-faint)" };
+/* === Карточка работы с материалами === */
 
-function OrderedTab({ orders, archivedOrders, onClickOrder, canAdmin, onEdit, onDelete }: {
-  orders: MaterialOrder[];
-  archivedOrders: MaterialOrder[];
-  onClickOrder: (o: MaterialOrder) => void;
-  canAdmin: boolean;
-  onEdit: (o: MaterialOrder) => void;
-  onDelete: (o: MaterialOrder) => void;
+function MaterialWorkCard({ work, expanded, onToggle, onUpdated, isMobile }: {
+  work: MaterialWork;
+  expanded: boolean;
+  onToggle: () => void;
+  onUpdated: () => void;
+  isMobile: boolean;
 }) {
-  const [showArchive, setShowArchive] = useState(false);
+  const location = [work.building_name, work.work_type_name].filter(Boolean).join(" / ");
+  const subLocation = [work.floor_name, work.construction_name].filter(Boolean).join(" / ");
+  const statusColor = STATUS_COLORS[work.status] || "#9ca3af";
+  const isCompleted = work.status === "completed";
+  const isInProgress = work.status === "in_progress";
 
-  if (orders.length === 0 && archivedOrders.length === 0) {
-    return <EmptyState message="Нет заказов" hint="Нажмите «Заказать» для создания первой заявки на материалы" />;
-  }
+  // Сводка по материалам
+  const totalRequired = work.materials.reduce((s, m) => s + m.required_qty, 0);
+  const totalUsed = work.materials.reduce((s, m) => s + m.used_qty, 0);
+  const overuse = Math.max(0, totalUsed - totalRequired);
 
   return (
-    <div>
-      <div className="ds-card overflow-hidden">
-        <table className="ds-table">
-          <thead>
-            <tr>
-              <th className="w-16">№</th>
-              <th className="w-24">Дата</th>
-              <th>Место / Вид работ</th>
-              <th>Материалы</th>
-              <th className="w-24">Статус</th>
-              {canAdmin && <th className="w-20"></th>}
-            </tr>
-          </thead>
-          <tbody>
-            {orders.length === 0 && !showArchive ? (
-              <tr><td colSpan={canAdmin ? 6 : 5} className="px-4 py-6 text-center" style={{ color: "var(--ds-text-faint)" }}>Нет активных заказов</td></tr>
-            ) : orders.map((order) => (
-              <OrderRow key={order.id} order={order} onClick={() => onClickOrder(order)} canAdmin={canAdmin} onEdit={() => onEdit(order)} onDelete={() => onDelete(order)} />
-            ))}
-          </tbody>
-        </table>
-      </div>
+    <div className="ds-card overflow-hidden">
+      {/* Заголовок карточки — кликабельный */}
+      <div className="cursor-pointer" onClick={onToggle}>
+        <div className={`p-4 ${isMobile ? "" : "flex gap-4"}`}>
+          {/* Левая часть: информация о работе */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-sm font-medium" style={{ color: "var(--ds-text)" }}>{location}</span>
+              <span
+                className="text-[10px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap"
+                style={{ background: `color-mix(in srgb, ${statusColor} 15%, transparent)`, color: statusColor }}
+              >
+                {STATUS_LABELS[work.status]}
+              </span>
+              <svg className={`w-4 h-4 ml-auto transition-transform ${expanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: "var(--ds-text-faint)" }}>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+            {subLocation && (
+              <p className="text-xs mb-2" style={{ color: "var(--ds-text-faint)" }}>{subLocation}</p>
+            )}
 
-      {archivedOrders.length > 0 && (
-        <div className="mt-3">
-          <button
-            onClick={() => setShowArchive(!showArchive)}
-            className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5"
-            style={{ color: "var(--ds-text-faint)" }}
-          >
-            <svg className={`w-3 h-3 transition-transform ${showArchive ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-            Архив ({archivedOrders.length})
-          </button>
-          {showArchive && (
-            <div className="ds-card overflow-hidden mt-1">
-              <table className="ds-table">
-                <tbody>
-                  {archivedOrders.map((order) => (
-                    <OrderRow key={order.id} order={order} onClick={() => onClickOrder(order)} canAdmin={canAdmin} onEdit={() => onEdit(order)} onDelete={() => onDelete(order)} />
-                  ))}
-                </tbody>
-              </table>
+            {/* Сводка материалов в компактном виде */}
+            <div className="flex flex-wrap gap-3 mt-2">
+              <MaterialStat label="Использовано" value={totalUsed} color="#f59e0b" />
+              {overuse > 0 && <MaterialStat label="Перерасход" value={overuse} color="#ef4444" />}
+              <MaterialStat label="Заявлено" value={totalRequired} color="#9ca3af" />
+            </div>
+          </div>
+
+          {/* Правая часть: превью подложки (десктоп) */}
+          {!isMobile && (
+            <div className="shrink-0" style={{ width: 160 }}>
+              <WorkMaskPreview workId={work.id} />
             </div>
           )}
         </div>
-      )}
-    </div>
-  );
-}
 
-function OrderRow({ order, onClick, canAdmin, onEdit, onDelete }: {
-  order: MaterialOrder; onClick: () => void;
-  canAdmin?: boolean; onEdit?: () => void; onDelete?: () => void;
-}) {
-  const location = [order.building_name, order.work_type_name].filter(Boolean).join(" / ");
-  const sub = [order.floor_name, order.construction_name].filter(Boolean).join(" / ");
-  const date = order.created_at ? new Date(order.created_at).toLocaleDateString("ru") : "";
-  const statusColor = STATUS_COLORS[order.status] || "var(--ds-text-faint)";
-
-  return (
-    <tr className="cursor-pointer" onClick={onClick}>
-      <td className="text-sm font-medium" style={{ color: "var(--ds-accent)" }}>#{order.order_number}</td>
-      <td className="text-xs" style={{ color: "var(--ds-text-faint)" }}>{date}</td>
-      <td>
-        <div className="text-sm" style={{ color: "var(--ds-text)" }}>{location}</div>
-        {sub && <div className="text-xs" style={{ color: "var(--ds-text-faint)" }}>{sub}</div>}
-      </td>
-      <td>
-        <div className="flex flex-col gap-0.5">
-          {(order.items || []).map((it, i) => {
-            const pct = it.quantity > 0 ? Math.min(100, (it.delivered_quantity / it.quantity) * 100) : 0;
-            return (
-              <div key={i} className="flex items-center gap-2">
-                <span className="text-xs truncate" style={{ color: "var(--ds-text-muted)", maxWidth: 120 }}>{it.material_name}</span>
-                <div className="flex-1 h-3 rounded-full overflow-hidden" style={{ background: "var(--ds-surface-sunken)", minWidth: 60 }}>
-                  <div className="h-full rounded-full" style={{ width: `${pct}%`, background: pct >= 100 ? "#22c55e" : "#3b82f6" }} />
-                </div>
-                <span className="text-[10px] font-mono whitespace-nowrap" style={{ color: "var(--ds-text-faint)" }}>
-                  {it.delivered_quantity}/{it.quantity}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </td>
-      <td>
-        <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-medium" style={{ background: `color-mix(in srgb, ${statusColor} 15%, transparent)`, color: statusColor }}>
-          {STATUS_LABELS[order.status] || order.status}
-        </span>
-      </td>
-      {canAdmin && (
-        <td>
-          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-            <button
-              className="ds-icon-btn p-1"
-              title="Редактировать"
-              onClick={() => onEdit?.()}
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-            </button>
-            <button
-              className="ds-icon-btn p-1"
-              title="Удалить"
-              onClick={() => onDelete?.()}
-              style={{ color: "#ef4444" }}
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-            </button>
+        {/* Превью на мобильном — под основным блоком */}
+        {isMobile && (
+          <div className="px-4 pb-3">
+            <WorkMaskPreview workId={work.id} />
           </div>
-        </td>
-      )}
-    </tr>
-  );
-}
+        )}
+      </div>
 
-function RemainingTab({ groups }: { groups: RemainingGroup[] }) {
-  const { isMobile } = useMobile();
+      {/* Развёрнутый вид: детали по каждому материалу */}
+      {expanded && (
+        <div className="border-t" style={{ borderColor: "var(--ds-border)" }}>
+          <div className="p-4 space-y-3">
+            {work.materials.map(mat => {
+              const matOveruse = Math.max(0, mat.used_qty - mat.required_qty);
+              const matRemaining = Math.max(0, mat.required_qty - mat.used_qty);
 
-  if (groups.length === 0) {
-    return <EmptyState message="Нет остатков" hint="Данные появятся после фиксации поступлений" />;
-  }
-
-  return (
-    <div className="space-y-4">
-      {groups.map((group, gi) => {
-        const locationParts = [group.building_name, group.work_type_name, group.floor_name, group.construction_name].filter(Boolean);
-        const location = locationParts.length > 0 ? locationParts.join(" / ") : "Общее (без привязки к месту)";
-        return (
-          <div key={gi} className="ds-card overflow-hidden">
-            <div className="px-4 py-3 border-b" style={{ borderColor: "var(--ds-border)", background: "var(--ds-surface-sunken)" }}>
-              <p className="text-sm font-medium" style={{ color: "var(--ds-text)" }}>{location}</p>
-            </div>
-            <div className="divide-y" style={{ borderColor: "var(--ds-border)" }}>
-              {group.items.map((item, ii) => (
-                <div key={ii} className="px-4 py-2.5 flex items-center justify-between">
-                  <div className="min-w-0 flex-1">
-                    <span className="text-sm" style={{ color: "var(--ds-text)" }}>{item.material_name}</span>
-                    <span className="text-xs ml-2" style={{ color: "var(--ds-text-faint)" }}>{item.unit_name}</span>
+              return (
+                <div key={mat.id} className="p-3 rounded-lg" style={{ background: "var(--ds-surface-sunken)" }}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium" style={{ color: "var(--ds-text)" }}>{mat.material_name}</span>
+                    <span className="text-xs" style={{ color: "var(--ds-text-faint)" }}>{mat.unit_short}</span>
                   </div>
-                  <span
-                    className="text-sm font-medium ml-3 whitespace-nowrap"
-                    style={{ color: item.remaining > 0 ? "#22c55e" : "var(--ds-text-faint)" }}
-                  >
-                    {item.remaining}
-                  </span>
+                  <div className={`grid gap-2 ${isMobile ? "grid-cols-2" : "grid-cols-4"}`}>
+                    <MaterialStatBlock label="Использовано" value={mat.used_qty} unit={mat.unit_short} color="#f59e0b" />
+                    <MaterialStatBlock label="Перерасход" value={matOveruse} unit={mat.unit_short} color={matOveruse > 0 ? "#ef4444" : "#9ca3af"} />
+                    <MaterialStatBlock label="Заявлено" value={mat.required_qty} unit={mat.unit_short} color="#3b82f6" />
+                    <MaterialStatBlock label="Остаток" value={matRemaining} unit={mat.unit_short} color={matRemaining > 0 ? "#22c55e" : "#9ca3af"} />
+                  </div>
+                  {/* Прогресс-бар */}
+                  <div className="mt-2 h-2 rounded-full overflow-hidden" style={{ background: "var(--ds-border)" }}>
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{
+                        width: `${Math.min(100, mat.required_qty > 0 ? (mat.used_qty / mat.required_qty) * 100 : 0)}%`,
+                        background: matOveruse > 0 ? "#ef4444" : "#f59e0b",
+                      }}
+                    />
+                  </div>
                 </div>
-              ))}
-            </div>
+              );
+            })}
+
+            {/* Комментарий при перерасходе (если работа завершена) */}
+            {isCompleted && work.completion_comment && (
+              <div className="p-3 rounded-lg" style={{ background: "color-mix(in srgb, #ef4444 10%, var(--ds-surface))" }}>
+                <p className="text-xs font-medium mb-1" style={{ color: "#ef4444" }}>Комментарий к перерасходу</p>
+                <p className="text-sm" style={{ color: "var(--ds-text)" }}>{work.completion_comment}</p>
+              </div>
+            )}
+
+            {/* Кнопка завершения для in_progress */}
+            {isInProgress && (
+              <CompleteWorkSection workId={work.id} materials={work.materials} onCompleted={onUpdated} />
+            )}
           </div>
-        );
-      })}
+        </div>
+      )}
     </div>
   );
 }
 
-function DraftsTab({ orders, onClickOrder, onEdit, onDelete, onSubmit }: {
-  orders: MaterialOrder[];
-  onClickOrder: (o: MaterialOrder) => void;
-  onEdit: (o: MaterialOrder) => void;
-  onDelete: (o: MaterialOrder) => void;
-  onSubmit: (o: MaterialOrder) => void;
-}) {
-  const { isMobile } = useMobile();
+/* === Секция завершения работы === */
 
-  if (orders.length === 0) {
-    return <EmptyState message="Нет черновиков" hint="Черновики появятся при сохранении заказа без отправки" />;
+function CompleteWorkSection({ workId, materials, onCompleted }: {
+  workId: string;
+  materials: WorkMaterial[];
+  onCompleted: () => void;
+}) {
+  const [showComplete, setShowComplete] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [completionComment, setCompletionComment] = useState("");
+
+  // Определяем ситуацию: перерасход или остатки
+  const hasOveruse = materials.some(m => m.used_qty > m.required_qty);
+  const hasUnused = materials.some(m => m.used_qty < m.required_qty);
+
+  const [dispositions, setDispositions] = useState<Disposition[]>([]);
+
+  const startComplete = () => {
+    // Формируем dispositions для материалов с остатками
+    setDispositions(materials
+      .filter(m => m.required_qty - m.used_qty > 0)
+      .map(m => ({
+        material_id: m.id,
+        name: m.material_name,
+        unit: m.unit_short,
+        unused: m.required_qty - m.used_qty,
+        action: "returned" as const,
+        qty: String(m.required_qty - m.used_qty),
+        notes: "",
+      }))
+    );
+    setShowComplete(true);
+  };
+
+  const handleComplete = async () => {
+    // Валидация: при перерасходе комментарий обязателен
+    if (hasOveruse && !completionComment.trim()) {
+      alert("Укажите причину перерасхода материалов");
+      return;
+    }
+
+    setLoading(true);
+    await api.post(`/api/installation/works/${workId}/complete`, {
+      completion_comment: completionComment || null,
+      dispositions: dispositions.map(d => ({
+        material_id: d.material_id,
+        quantity: Number(d.qty) || 0,
+        disposition: d.action,
+        notes: d.notes || null,
+      })),
+    });
+    setLoading(false);
+    setShowComplete(false);
+    onCompleted();
+  };
+
+  if (!showComplete) {
+    return (
+      <button onClick={startComplete} className="ds-btn-secondary w-full text-sm py-2" style={{ color: "#22c55e", borderColor: "#22c55e" }}>
+        Завершить работу
+      </button>
+    );
   }
 
   return (
-    <div className={`grid gap-3 ${isMobile ? "grid-cols-1" : "grid-cols-2 lg:grid-cols-3"}`}>
-      {orders.map((order) => (
-        <OrderCard
-          key={order.id}
-          order={order}
-          onClick={() => onClickOrder(order)}
-          isDraft
-          onEdit={() => onEdit(order)}
-          onDelete={() => onDelete(order)}
-          onSubmit={() => onSubmit(order)}
-        />
-      ))}
+    <div className="p-4 rounded-lg" style={{ background: "var(--ds-surface-sunken)" }}>
+      <h4 className="text-sm font-semibold mb-3" style={{ color: "var(--ds-text)" }}>Завершение работы</h4>
+
+      {/* Перерасход: комментарий обязателен */}
+      {hasOveruse && (
+        <div className="mb-3">
+          <label className="block text-xs font-medium mb-1" style={{ color: "#ef4444" }}>
+            Обнаружен перерасход материалов. Укажите причину *
+          </label>
+          <textarea
+            className="ds-input w-full text-sm"
+            rows={2}
+            placeholder="Почему материалов использовано больше плана..."
+            value={completionComment}
+            onChange={e => setCompletionComment(e.target.value)}
+          />
+        </div>
+      )}
+
+      {/* Остатки: выбор куда направить */}
+      {hasUnused && dispositions.length > 0 && (
+        <div className="mb-3">
+          <p className="text-xs font-medium mb-2" style={{ color: "var(--ds-text-muted)" }}>Неиспользованные материалы</p>
+          {dispositions.map((d, i) => (
+            <div key={d.material_id} className="mb-3 p-2 rounded" style={{ background: "var(--ds-surface)" }}>
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="text-sm flex-1" style={{ color: "var(--ds-text)" }}>{d.name} ({d.unused} {d.unit})</span>
+              </div>
+              <div className="flex items-center gap-2 mb-1.5">
+                <select
+                  className="ds-input text-xs flex-1"
+                  value={d.action}
+                  onChange={e => setDispositions(p => p.map((x, j) => j === i ? { ...x, action: e.target.value as "returned" | "scrap" } : x))}
+                >
+                  <option value="returned">В остатки</option>
+                  <option value="scrap">В утиль</option>
+                </select>
+                <input
+                  className="ds-input w-20 text-xs text-center"
+                  type="number"
+                  value={d.qty}
+                  onChange={e => setDispositions(p => p.map((x, j) => j === i ? { ...x, qty: e.target.value } : x))}
+                />
+              </div>
+              <textarea
+                className="ds-input w-full text-xs"
+                rows={1}
+                placeholder="Комментарий..."
+                value={d.notes}
+                onChange={e => setDispositions(p => p.map((x, j) => j === i ? { ...x, notes: e.target.value } : x))}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <button onClick={handleComplete} disabled={loading} className="ds-btn text-sm">
+          {loading ? "..." : "Подтвердить завершение"}
+        </button>
+        <button onClick={() => setShowComplete(false)} className="ds-btn-secondary text-sm">Отмена</button>
+      </div>
     </div>
   );
 }
 
-function EmptyState({ message, hint }: { message: string; hint: string }) {
+/* === Утилиты для отображения === */
+
+function MaterialStat({ label, value, color }: { label: string; value: number; color: string }) {
   return (
-    <div className="ds-card p-8 text-center">
-      <svg className="w-12 h-12 mx-auto mb-3" style={{ color: "var(--ds-text-faint)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-      </svg>
-      <p className="font-medium mb-1" style={{ color: "var(--ds-text)" }}>{message}</p>
-      <p className="text-sm" style={{ color: "var(--ds-text-faint)" }}>{hint}</p>
+    <span className="flex items-center gap-1 text-xs" style={{ color: "var(--ds-text-faint)" }}>
+      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+      {label}: <span className="font-medium" style={{ color }}>{value}</span>
+    </span>
+  );
+}
+
+function MaterialStatBlock({ label, value, unit, color }: { label: string; value: number; unit: string; color: string }) {
+  return (
+    <div className="text-center p-2 rounded" style={{ background: "var(--ds-surface)" }}>
+      <p className="text-[10px] uppercase tracking-wide mb-0.5" style={{ color: "var(--ds-text-faint)" }}>{label}</p>
+      <p className="text-sm font-semibold" style={{ color }}>{value}</p>
+      <p className="text-[10px]" style={{ color: "var(--ds-text-faint)" }}>{unit}</p>
     </div>
   );
 }

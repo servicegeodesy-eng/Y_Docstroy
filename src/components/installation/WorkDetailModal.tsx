@@ -27,7 +27,6 @@ export default function WorkDetailModal({ workId, onClose, onUpdated }: Props) {
   const [work, setWork] = useState<WorkData | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
-  const [overlayPreviewUrl, setOverlayPreviewUrl] = useState("");
 
   // Edit mode
   const isAdmin = isProjectAdmin || isPortalAdmin;
@@ -42,7 +41,8 @@ export default function WorkDetailModal({ workId, onClose, onUpdated }: Props) {
 
   // Complete
   const [showComplete, setShowComplete] = useState(false);
-  const [dispositions, setDispositions] = useState<{ id: string; name: string; unit: string; unused: number; action: "returned" | "scrap"; qty: string }[]>([]);
+  const [completionComment, setCompletionComment] = useState("");
+  const [dispositions, setDispositions] = useState<{ id: string; name: string; unit: string; unused: number; action: "returned" | "scrap"; qty: string; notes: string }[]>([]);
 
   const loadWork = useCallback(async () => {
     setLoading(true);
@@ -52,12 +52,15 @@ export default function WorkDetailModal({ workId, onClose, onUpdated }: Props) {
       setWork({
         ...d,
         progress: Number(d.progress) || 0,
-        materials: (d.materials || []).map((m: Record<string, unknown>) => ({
-          ...m,
+        materials: ((d.materials || []) as unknown as Record<string, unknown>[]).map(m => ({
+          id: (m.id || "") as string,
+          order_item_id: (m.order_item_id || "") as string,
+          material_name: (m.material_name || "") as string,
+          unit_short: (m.unit_short || "") as string,
           required_qty: Number(m.required_qty) || 0,
           available_qty: Number(m.available_qty) || 0,
           used_qty: Number(m.used_qty) || 0,
-        })) as WorkMaterial[],
+        })),
         files: d.files || [],
       });
     }
@@ -144,18 +147,26 @@ export default function WorkDetailModal({ workId, onClose, onUpdated }: Props) {
     loadWork();
   }
 
+  const hasOveruse = work ? work.materials.some(m => m.used_qty > m.required_qty) : false;
+
   function prepareComplete() {
+    setCompletionComment("");
     setDispositions(work!.materials.filter(m => m.available_qty - m.used_qty > 0).map(m => ({
       id: m.order_item_id || m.id, name: m.material_name, unit: m.unit_short,
-      unused: m.available_qty - m.used_qty, action: "returned" as const, qty: String(m.available_qty - m.used_qty),
+      unused: m.available_qty - m.used_qty, action: "returned" as const, qty: String(m.available_qty - m.used_qty), notes: "",
     })));
     setShowComplete(true);
   }
 
   async function handleComplete() {
+    if (hasOveruse && !completionComment.trim()) {
+      alert("Укажите причину перерасхода материалов");
+      return;
+    }
     setActionLoading(true);
     await api.post(`/api/installation/works/${workId}/complete`, {
-      dispositions: dispositions.map(d => ({ order_item_id: d.id, quantity: Number(d.qty) || 0, disposition: d.action })),
+      completion_comment: completionComment || null,
+      dispositions: dispositions.map(d => ({ order_item_id: d.id, quantity: Number(d.qty) || 0, disposition: d.action, notes: d.notes || null })),
     });
     setActionLoading(false); setShowComplete(false);
     loadWork(); onUpdated();
@@ -348,21 +359,46 @@ export default function WorkDetailModal({ workId, onClose, onUpdated }: Props) {
           )}
           {showComplete && (
             <div className="p-4 rounded-lg" style={{ background: "var(--ds-surface-sunken)" }}>
-              <h4 className="text-sm font-semibold mb-3" style={{ color: "var(--ds-text)" }}>Неиспользованные материалы</h4>
-              {dispositions.length === 0 ? (
-                <p className="text-xs" style={{ color: "var(--ds-text-faint)" }}>Все материалы использованы</p>
-              ) : dispositions.map((d, i) => (
-                <div key={d.id} className="flex items-center gap-2 mb-2">
-                  <span className="text-sm flex-1">{d.name} ({d.unused} {d.unit})</span>
-                  <select className="ds-input w-28 text-xs" value={d.action}
-                    onChange={e => setDispositions(p => p.map((x, j) => j === i ? { ...x, action: e.target.value as "returned" | "scrap" } : x))}>
-                    <option value="returned">В остатки</option><option value="scrap">В утиль</option>
-                  </select>
-                  <input className="ds-input w-16 text-xs text-center" type="number" value={d.qty}
-                    onChange={e => setDispositions(p => p.map((x, j) => j === i ? { ...x, qty: e.target.value } : x))} />
+              <h4 className="text-sm font-semibold mb-3" style={{ color: "var(--ds-text)" }}>Завершение работы</h4>
+
+              {/* Комментарий при перерасходе */}
+              {hasOveruse && (
+                <div className="mb-3">
+                  <label className="block text-xs font-medium mb-1" style={{ color: "#ef4444" }}>
+                    Обнаружен перерасход материалов. Укажите причину *
+                  </label>
+                  <textarea className="ds-input w-full text-sm" rows={2} placeholder="Почему материалов использовано больше плана..."
+                    value={completionComment} onChange={e => setCompletionComment(e.target.value)} />
                 </div>
-              ))}
-              <div className="flex gap-2 mt-3">
+              )}
+
+              {/* Неиспользованные материалы */}
+              {dispositions.length === 0 ? (
+                <p className="text-xs mb-3" style={{ color: "var(--ds-text-faint)" }}>Все материалы использованы</p>
+              ) : (
+                <div className="mb-3">
+                  <p className="text-xs font-medium mb-2" style={{ color: "var(--ds-text-muted)" }}>Неиспользованные материалы</p>
+                  {dispositions.map((d, i) => (
+                    <div key={d.id} className="mb-2 p-2 rounded" style={{ background: "var(--ds-surface)" }}>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="text-sm flex-1">{d.name} ({d.unused} {d.unit})</span>
+                      </div>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <select className="ds-input flex-1 text-xs" value={d.action}
+                          onChange={e => setDispositions(p => p.map((x, j) => j === i ? { ...x, action: e.target.value as "returned" | "scrap" } : x))}>
+                          <option value="returned">В остатки</option><option value="scrap">В утиль</option>
+                        </select>
+                        <input className="ds-input w-16 text-xs text-center" type="number" value={d.qty}
+                          onChange={e => setDispositions(p => p.map((x, j) => j === i ? { ...x, qty: e.target.value } : x))} />
+                      </div>
+                      <input className="ds-input w-full text-xs" placeholder="Комментарий..."
+                        value={d.notes} onChange={e => setDispositions(p => p.map((x, j) => j === i ? { ...x, notes: e.target.value } : x))} />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex gap-2">
                 <button onClick={handleComplete} disabled={actionLoading} className="ds-btn text-sm">{actionLoading ? "..." : "Подтвердить"}</button>
                 <button onClick={() => setShowComplete(false)} className="ds-btn-secondary text-sm">Отмена</button>
               </div>

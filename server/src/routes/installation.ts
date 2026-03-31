@@ -74,14 +74,16 @@ router.get('/works', async (req: AuthRequest, res: Response) => {
         (SELECT json_agg(json_build_object(
           'id', im.id, 'order_item_id', im.order_item_id,
           'required_qty', im.required_qty, 'used_qty', im.used_qty,
-          'material_name', dm.name, 'unit_short', du.short_name,
+          'material_name', COALESCE(dm.name, im.material_name),
+          'unit_short', COALESCE(du.short_name, du2.short_name, im.unit_name),
           'order_number', mo.order_number,
-          'available_qty', LEAST(im.required_qty, moi.delivered_qty)
+          'available_qty', CASE WHEN im.order_item_id IS NOT NULL THEN LEAST(im.required_qty, moi.delivered_qty) ELSE im.required_qty END
         )) FROM installation_materials im
-          JOIN material_order_items moi ON moi.id = im.order_item_id
-          JOIN dict_materials dm ON dm.id = moi.material_id
+          LEFT JOIN material_order_items moi ON moi.id = im.order_item_id
+          LEFT JOIN dict_materials dm ON dm.id = COALESCE(moi.material_id, im.material_id)
           LEFT JOIN dict_units du ON du.id = dm.unit_id
-          JOIN material_orders mo ON mo.id = moi.order_id
+          LEFT JOIN dict_units du2 ON du2.id = im.unit_id
+          LEFT JOIN material_orders mo ON mo.id = moi.order_id
           WHERE im.work_id = iw.id
         ) as materials
       FROM installation_works iw
@@ -128,14 +130,17 @@ router.get('/works/:id', async (req: AuthRequest, res: Response) => {
     if (work.rows.length === 0) { res.status(404).json({ error: 'Работа не найдена' }); return; }
 
     const materials = await pool.query(
-      `SELECT im.*, dm.name as material_name, du.short_name as unit_short,
+      `SELECT im.*,
+              COALESCE(dm.name, im.material_name) as material_name,
+              COALESCE(du.short_name, du2.short_name, im.unit_name) as unit_short,
               mo.order_number, moi.quantity as ordered_qty,
-              LEAST(im.required_qty, moi.delivered_qty) as available_qty
+              CASE WHEN im.order_item_id IS NOT NULL THEN LEAST(im.required_qty, moi.delivered_qty) ELSE im.required_qty END as available_qty
        FROM installation_materials im
-       JOIN material_order_items moi ON moi.id = im.order_item_id
-       JOIN dict_materials dm ON dm.id = moi.material_id
+       LEFT JOIN material_order_items moi ON moi.id = im.order_item_id
+       LEFT JOIN dict_materials dm ON dm.id = COALESCE(moi.material_id, im.material_id)
        LEFT JOIN dict_units du ON du.id = dm.unit_id
-       JOIN material_orders mo ON mo.id = moi.order_id
+       LEFT JOIN dict_units du2 ON du2.id = im.unit_id
+       LEFT JOIN material_orders mo ON mo.id = moi.order_id
        WHERE im.work_id = $1`, [workId]
     );
 
@@ -178,13 +183,21 @@ router.post('/works', async (req: AuthRequest, res: Response) => {
     );
     const work = workResult.rows[0];
 
-    // Привязка материалов из заявок
+    // Привязка материалов (напрямую или из заявок)
     if (materials && Array.isArray(materials)) {
       for (const m of materials) {
         if (m.order_item_id && m.required_qty > 0) {
+          // Из заявки
           await pool.query(
             'INSERT INTO installation_materials (work_id, order_item_id, required_qty) VALUES ($1, $2, $3)',
             [work.id, m.order_item_id, m.required_qty]
+          );
+        } else if (m.required_qty > 0) {
+          // Прямое указание материала
+          await pool.query(
+            `INSERT INTO installation_materials (work_id, material_id, unit_id, material_name, unit_name, required_qty)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [work.id, m.material_id || null, m.unit_id || null, m.material_name || null, m.unit_name || null, m.required_qty]
           );
         }
       }
@@ -361,25 +374,27 @@ router.post('/works/:id/complete', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
     const workId = req.params.id;
-    const { dispositions } = req.body;
-    // dispositions: [{ order_item_id, quantity, disposition: 'scrap'|'returned', notes }]
+    const { dispositions, completion_comment } = req.body;
+    // dispositions: [{ material_id, order_item_id?, quantity, disposition: 'scrap'|'returned', notes }]
+    // completion_comment: string (при перерасходе — объяснение почему)
 
     // Завершаем работу
     const result = await pool.query(
-      `UPDATE installation_works SET status = 'completed', completed_at = NOW(), updated_at = NOW()
+      `UPDATE installation_works SET status = 'completed', completed_at = NOW(), updated_at = NOW(),
+       completion_comment = $2
        WHERE id = $1 AND status = 'in_progress' RETURNING *`,
-      [workId]
+      [workId, completion_comment || null]
     );
     if (result.rows.length === 0) { res.status(400).json({ error: 'Работа не найдена или не в процессе' }); return; }
 
     // Сохраняем распределение остатков
     if (dispositions && Array.isArray(dispositions)) {
       for (const d of dispositions) {
-        if (d.order_item_id && d.quantity > 0 && (d.disposition === 'scrap' || d.disposition === 'returned')) {
+        if (d.quantity > 0 && (d.disposition === 'scrap' || d.disposition === 'returned')) {
           await pool.query(
             `INSERT INTO material_dispositions (work_id, order_item_id, quantity, disposition, notes, created_by)
              VALUES ($1, $2, $3, $4, $5, $6)`,
-            [workId, d.order_item_id, d.quantity, d.disposition, d.notes || null, userId]
+            [workId, d.order_item_id || null, d.quantity, d.disposition, d.notes || null, userId]
           );
         }
       }
@@ -389,7 +404,7 @@ router.post('/works/:id/complete', async (req: AuthRequest, res: Response) => {
     await pool.query(
       `INSERT INTO installation_log (work_id, action, details, created_by)
        VALUES ($1, 'completed', $2, $3)`,
-      [workId, JSON.stringify({ dispositions_count: dispositions?.length || 0 }), userId]
+      [workId, JSON.stringify({ dispositions_count: dispositions?.length || 0, has_comment: !!completion_comment }), userId]
     );
 
     res.json(result.rows[0]);
