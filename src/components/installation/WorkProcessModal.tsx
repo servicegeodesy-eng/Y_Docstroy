@@ -7,9 +7,10 @@ import {
   WorkInfo,
   MaterialsSummaryCompact,
   MaterialsProgressList,
-  MaterialUsageRow,
   DispositionRow,
   ErrorBanner,
+  XIcon,
+  MaterialUsageCompactRow,
 } from "./WorkProcessParts";
 import type { MaterialUsage, Disposition } from "./WorkProcessParts";
 
@@ -32,6 +33,9 @@ export default function WorkProcessModal({ work, onClose, onUpdated }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [phase, setPhase] = useState<"process" | "complete">("process");
+  const [showMaterials, setShowMaterials] = useState(false);
+  const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
+  const [fixQty, setFixQty] = useState("");
 
   /* --- Photos --- */
   const [photos, setPhotos] = useState<File[]>([]);
@@ -72,18 +76,15 @@ export default function WorkProcessModal({ work, onClose, onUpdated }: Props) {
     onUpdated();
   };
 
-  const updateUsage = (id: string, patch: Partial<MaterialUsage>) => {
-    setUsages((prev) => prev.map((u) => (u.id === id ? { ...u, ...patch } : u)));
-  };
-
-  const handleUseMaterial = async (u: MaterialUsage) => {
-    const qty = Number(u.session_qty);
+  const handleUseMaterial = async () => {
+    if (!selectedMaterialId) return;
+    const qty = Number(fixQty);
     if (!qty || qty <= 0) return;
 
     setLoading(true);
     setError(null);
     const res = await api.post(`/api/installation/works/${work.id}/use-material`, {
-      installation_material_id: u.id,
+      installation_material_id: selectedMaterialId,
       quantity: qty,
     });
     if (res.error) {
@@ -92,25 +93,8 @@ export default function WorkProcessModal({ work, onClose, onUpdated }: Props) {
       return;
     }
     setLoading(false);
-    onUpdated();
-  };
-
-  const handleDelivery = async (u: MaterialUsage) => {
-    const qty = Number(u.delivery_qty);
-    if (!qty || qty <= 0) return;
-
-    setLoading(true);
-    setError(null);
-    const res = await api.post("/api/materials/deliveries", {
-      items: [{ order_item_id: u.order_item_id, quantity: qty }],
-    });
-    if (res.error) {
-      setError(res.error);
-      setLoading(false);
-      return;
-    }
-    updateUsage(u.id, { showDeliveryForm: false, delivery_qty: "" });
-    setLoading(false);
+    setFixQty("");
+    setSelectedMaterialId(null);
     onUpdated();
   };
 
@@ -301,7 +285,7 @@ export default function WorkProcessModal({ work, onClose, onUpdated }: Props) {
 
   return (
     <ModalShell title={`Работа #${work.work_number}`} onClose={onClose} isMobile={isMobile}>
-      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
         {error && <ErrorBanner message={error} />}
         <WorkInfo work={work} />
 
@@ -315,49 +299,123 @@ export default function WorkProcessModal({ work, onClose, onUpdated }: Props) {
           fileInputRef={fileInputRef}
         />
 
-        {/* ---- Materials section ---- */}
-        <section>
-          <label
-            className="block text-xs font-medium mb-2"
-            style={{ color: "var(--ds-text-muted)" }}
+        {/* ---- Complete button under photo ---- */}
+        <div className="flex justify-center">
+          <button
+            className="ds-btn text-sm px-6 py-2"
+            onClick={prepareComplete}
+            disabled={loading}
+            style={{ background: "#22c55e" }}
           >
-            Материалы
-          </label>
-          <div className="space-y-2">
-            {usages.map((u) => (
-              <MaterialUsageRow
-                key={u.id}
-                u={u}
-                loading={loading}
-                onUpdate={(patch) => updateUsage(u.id, patch)}
-                onUse={() => handleUseMaterial(u)}
-                onDelivery={() => handleDelivery(u)}
-              />
-            ))}
-            {usages.length === 0 && (
-              <p className="text-sm py-2" style={{ color: "var(--ds-text-faint)" }}>
-                Нет материалов
-              </p>
-            )}
-          </div>
+            Завершить монтаж
+          </button>
+        </div>
+
+        {/* ---- Materials collapsible section ---- */}
+        <section>
+          <button
+            className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+            style={{ background: "var(--ds-surface-sunken)", color: "var(--ds-text)" }}
+            onClick={() => setShowMaterials(!showMaterials)}
+          >
+            <span>Материалы</span>
+            <svg className={`w-4 h-4 transition-transform ${showMaterials ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {showMaterials && (
+            <div className="mt-2 space-y-1.5">
+              {usages.map((u) => {
+                const selected = selectedMaterialId === u.id;
+                return (
+                  <MaterialUsageCompactRow
+                    key={u.id}
+                    u={u}
+                    loading={loading}
+                    selected={selected}
+                    onSelect={() => setSelectedMaterialId(u.id)}
+                  />
+                );
+              })}
+              {usages.length === 0 && (
+                <p className="text-sm py-2 text-center" style={{ color: "var(--ds-text-faint)" }}>
+                  Нет материалов
+                </p>
+              )}
+            </div>
+          )}
         </section>
+
+        {/* ---- Fix Material Modal ---- */}
+        {selectedMaterialId && (
+          <div className="p-3 rounded-lg border" style={{ borderColor: "var(--ds-border)", background: "var(--ds-surface-sunken)" }}>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium" style={{ color: "var(--ds-text)" }}>
+                Фиксация материала
+              </span>
+              <button className="ds-icon-btn" onClick={() => { setSelectedMaterialId(null); setFixQty(""); }}>
+                <XIcon size={16} />
+              </button>
+            </div>
+            <div className="space-y-2">
+              <div>
+                <label className="text-xs" style={{ color: "var(--ds-text-muted)" }}>Количество</label>
+                <input
+                  type="number"
+                  className="ds-input text-sm w-full mt-1"
+                  min="0"
+                  step="0.01"
+                  placeholder="Введите количество"
+                  value={fixQty}
+                  onChange={(e) => setFixQty(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-xs" style={{ color: "var(--ds-text-muted)" }}>Фото подтверждения</label>
+                <div
+                  className="mt-1 border-2 border-dashed rounded-lg p-3 text-center"
+                  style={{ borderColor: "var(--ds-border)", background: "var(--ds-surface)" }}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith("image/"));
+                    if (files.length) setPhotos(prev => [...prev, ...files]);
+                  }}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    accept="image/*"
+                    onChange={handlePhotoAdd}
+                  />
+                  <p className="text-xs mb-2" style={{ color: "var(--ds-text-faint)" }}>
+                    Перетащите фото или нажмите кнопку
+                  </p>
+                  <button className="ds-btn text-xs px-3 py-1.5" onClick={() => fileInputRef.current?.click()}>
+                    Прикрепить файл
+                  </button>
+                </div>
+              </div>
+              <button
+                className="ds-btn w-full text-sm py-2"
+                onClick={handleUseMaterial}
+                disabled={loading || !fixQty || Number(fixQty) <= 0}
+              >
+                Зафиксировать использование
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Footer */}
       <div
-        className="flex items-center justify-end gap-2 px-5 py-4 border-t"
+        className="flex items-center justify-end gap-2 px-4 py-3 border-t"
         style={{ borderColor: "var(--ds-border)" }}
       >
         <button className="ds-btn-secondary text-sm px-4 py-2" onClick={onClose}>
           Закрыть
-        </button>
-        <button
-          className="ds-btn text-sm px-4 py-2"
-          onClick={prepareComplete}
-          disabled={loading}
-          style={{ background: "#22c55e" }}
-        >
-          Завершить монтаж
         </button>
       </div>
     </ModalShell>
@@ -386,19 +444,19 @@ function PhotoSection({
   return (
     <section>
       <label
-        className="block text-xs font-medium mb-2"
+        className="block text-xs font-medium mb-1.5"
         style={{ color: "var(--ds-text-muted)" }}
       >
         Фото
       </label>
       <div
-        className="border-2 border-dashed rounded-lg p-4 text-center transition-colors"
+        className="border-2 border-dashed rounded-lg p-3 text-center transition-colors"
         style={{ borderColor: "var(--ds-border)", background: "var(--ds-surface-sunken)" }}
         onDragOver={(e) => e.preventDefault()}
         onDrop={onDrop}
       >
         {photos.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-3">
+          <div className="flex flex-wrap gap-1.5 mb-2">
             {photos.map((f, i) => (
               <span
                 key={i}
@@ -416,8 +474,8 @@ function PhotoSection({
           </div>
         )}
         {photos.length === 0 && (
-          <p className="text-sm mb-2" style={{ color: "var(--ds-text-faint)" }}>
-            Перетащите фото сюда или нажмите кнопку
+          <p className="text-xs mb-2" style={{ color: "var(--ds-text-faint)" }}>
+            Перетащите фото или нажмите кнопку
           </p>
         )}
         <div className="flex items-center justify-center gap-2">
@@ -435,7 +493,7 @@ function PhotoSection({
           </button>
         </div>
         <input
-          ref={cameraInputRef}
+          ref={(el) => (cameraInputRef as any).current = el}
           type="file"
           className="hidden"
           accept="image/*"
@@ -443,7 +501,7 @@ function PhotoSection({
           onChange={onAdd}
         />
         <input
-          ref={fileInputRef}
+          ref={(el) => (fileInputRef as any).current = el}
           type="file"
           className="hidden"
           accept="image/*"

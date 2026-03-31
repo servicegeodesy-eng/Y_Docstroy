@@ -86,12 +86,12 @@ export function WorkInfo({ work }: { work: InstallationWork }) {
     .join(" / ");
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
       <div>
         <p className="text-xs font-medium" style={{ color: "var(--ds-text-muted)" }}>Место</p>
         <p className="text-sm" style={{ color: "var(--ds-text)" }}>{location}</p>
       </div>
-      <div className="flex gap-6">
+      <div className="flex gap-4">
         <div>
           <p className="text-xs font-medium" style={{ color: "var(--ds-text-muted)" }}>
             Плановая дата
@@ -289,6 +289,60 @@ export function MaterialUsageRow({
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ============================================================================
+   MaterialUsageCompactRow - компактная строка с индикатором
+   ============================================================================ */
+
+export function MaterialUsageCompactRow({
+  u,
+  loading,
+  selected,
+  onSelect,
+}: {
+  u: MaterialUsage;
+  loading: boolean;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const required = Number(u.required_qty) || 0;
+  const available = Number(u.available_qty) || 0;
+  const used = Number(u.used_qty) || 0;
+  const maxVal = Math.max(required, 1);
+  
+  // Проценты для индикатора
+  const availablePct = Math.min((available / maxVal) * 100, 100);
+  const usedPct = Math.min((used / maxVal) * 100, 100);
+
+  return (
+    <div 
+      className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors ${selected ? 'ring-2 ring-blue-500' : ''}`}
+      style={{ background: selected ? "var(--ds-surface)" : "var(--ds-surface-sunken)" }}
+      onClick={onSelect}
+    >
+      {/* Индикатор из 3 цветов */}
+      <div className="flex-1 h-4 rounded-full overflow-hidden relative" style={{ background: "#ffffff" }}>
+        {/* Желтый - поступило */}
+        <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${availablePct}%`, background: "#f59e0b" }} />
+        {/* Темно-зеленый - использовано */}
+        <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${usedPct}%`, background: "#15803d" }} />
+      </div>
+      {/* Цифры необходимое/поступило/использовано */}
+      <span className="text-xs font-mono whitespace-nowrap" style={{ color: "var(--ds-text-faint)" }}>
+        {required}/{available}/{used}
+      </span>
+      
+      {/* Кнопка Зафиксировать */}
+      <button
+        className="ds-btn text-xs px-3 py-1.5 whitespace-nowrap"
+        onClick={(e) => { e.stopPropagation(); onSelect(); }}
+        disabled={loading}
+      >
+        Зафиксировать
+      </button>
     </div>
   );
 }
