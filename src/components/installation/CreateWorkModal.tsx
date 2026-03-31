@@ -115,7 +115,7 @@ export default function CreateWorkModal({ onClose, onCreated }: Props) {
     if (match) {
       setLinkedOverlay({ id: match.id, name: match.name, width: match.width || 1000, height: match.height || 750, storage_path: match.storage_path });
       setOverlayIdForMasks(match.id);
-      getOverlayUrl(match.storage_path).then(setOverlayUrl);
+      getOverlayUrl(match.storage_path).then(url => { if (url) setOverlayUrl(url); });
       // Загружаем маски работ для этой подложки
       api.get<Record<string, unknown>[]>("/api/installation/masks", { overlay_id: match.id }).then(r => {
         if (r.data) {
