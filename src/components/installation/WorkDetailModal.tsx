@@ -131,11 +131,14 @@ export default function WorkDetailModal({ workId, onClose, onUpdated }: Props) {
   }
 
   // Фиксация поступления
+  const [deliveryError, setDeliveryError] = useState<string | null>(null);
   async function handleDelivery(matId: string) {
     const qty = Number(deliveryQty) || 0;
     if (qty <= 0) return;
+    setDeliveryError(null);
     setActionLoading(true);
-    await api.post(`/api/installation/works/${workId}/deliver-material`, { installation_material_id: matId, quantity: qty });
+    const res = await api.post(`/api/installation/works/${workId}/deliver-material`, { installation_material_id: matId, quantity: qty });
+    if (res.error) { setDeliveryError(res.error); setActionLoading(false); return; }
     // Загрузка файлов поступления
     for (const file of deliveryFiles) {
       const fd = new FormData(); fd.append("file", file); fd.append("work_id", workId); fd.append("category", "delivery");
@@ -147,16 +150,18 @@ export default function WorkDetailModal({ workId, onClose, onUpdated }: Props) {
   }
 
   // Фиксация процесса (использование)
+  const [usageError, setUsageError] = useState<string | null>(null);
   async function handleUseMaterial(matId: string) {
     const qty = Number(usageQty) || 0;
     if (qty <= 0) return;
-    const mat = work!.materials.find(m => m.id === matId);
-    if (mat && Number(mat.used_qty) + qty > mat.available_qty) {
-      alert(`Использовано не может превысить поступление (${mat.available_qty})`);
+    setUsageError(null);
+    setActionLoading(true);
+    const res = await api.post(`/api/installation/works/${workId}/use-material`, { installation_material_id: matId, quantity: qty });
+    if (res.error) {
+      setUsageError(res.error);
+      setActionLoading(false);
       return;
     }
-    setActionLoading(true);
-    await api.post(`/api/installation/works/${workId}/use-material`, { installation_material_id: matId, quantity: qty });
     for (const file of usageFiles) {
       const fd = new FormData(); fd.append("file", file); fd.append("work_id", workId); fd.append("category", "usage");
       await api.upload("/api/installation/files", fd);
@@ -419,13 +424,14 @@ export default function WorkDetailModal({ workId, onClose, onUpdated }: Props) {
                   <input className="ds-input w-full text-sm mb-2" type="number" min="0" step="0.01" placeholder="Количество поступления"
                     value={deliveryQty} onChange={e => setDeliveryQty(e.target.value)} />
                   <FileChips files={deliveryFiles} onRemove={i => setDeliveryFiles(p => p.filter((_, j) => j !== i))} />
+                  {deliveryError && <p className="text-xs text-red-500 mt-1">{deliveryError}</p>}
                   <div className="flex gap-2 mt-2">
                     <button onClick={() => pickFiles(setDeliveryFiles)} className="ds-btn-secondary text-xs px-3 py-1.5">+ Файл</button>
                     <div className="flex-1" />
                     <button onClick={() => handleDelivery(deliveryMat!)} disabled={actionLoading || !deliveryQty} className="ds-btn text-xs px-4 py-1.5">
                       {actionLoading ? "..." : "Зафиксировать"}
                     </button>
-                    <button onClick={() => { setDeliveryMat(null); setDeliveryQty(""); setDeliveryFiles([]); }} className="ds-btn-secondary text-xs px-3 py-1.5">Отмена</button>
+                    <button onClick={() => { setDeliveryMat(null); setDeliveryQty(""); setDeliveryFiles([]); setDeliveryError(null); }} className="ds-btn-secondary text-xs px-3 py-1.5">Отмена</button>
                   </div>
                 </div>
               ) : (
@@ -445,13 +451,14 @@ export default function WorkDetailModal({ workId, onClose, onUpdated }: Props) {
                   <input className="ds-input w-full text-sm mb-2" type="number" min="0" step="0.01" placeholder="Количество использовано"
                     value={usageQty} onChange={e => setUsageQty(e.target.value)} />
                   <FileChips files={usageFiles} onRemove={i => setUsageFiles(p => p.filter((_, j) => j !== i))} />
+                  {usageError && <p className="text-xs text-red-500 mt-1">{usageError}</p>}
                   <div className="flex gap-2 mt-2">
                     <button onClick={() => pickFiles(setUsageFiles)} className="ds-btn-secondary text-xs px-3 py-1.5">+ Файл</button>
                     <div className="flex-1" />
                     <button onClick={() => handleUseMaterial(usageMat!)} disabled={actionLoading || !usageQty} className="ds-btn text-xs px-4 py-1.5">
                       {actionLoading ? "..." : "Зафиксировать"}
                     </button>
-                    <button onClick={() => { setUsageMat(null); setUsageQty(""); setUsageFiles([]); }} className="ds-btn-secondary text-xs px-3 py-1.5">Отмена</button>
+                    <button onClick={() => { setUsageMat(null); setUsageQty(""); setUsageFiles([]); setUsageError(null); }} className="ds-btn-secondary text-xs px-3 py-1.5">Отмена</button>
                   </div>
                 </div>
               ) : (

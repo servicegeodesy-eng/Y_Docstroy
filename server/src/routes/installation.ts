@@ -332,22 +332,19 @@ router.post('/works/:id/use-material', async (req: AuthRequest, res: Response) =
       res.status(400).json({ error: 'installation_material_id и quantity обязательны' }); return;
     }
 
-    // Проверяем что used_qty + quantity <= available_qty (не может превысить поступление)
+    // Проверяем что материал существует и used_qty + quantity <= available_qty
     const matCheck = await pool.query(
-      `SELECT im.*,
-        CASE WHEN im.order_item_id IS NOT NULL
-          THEN LEAST(im.required_qty, moi.delivered_qty)
-          ELSE im.available_qty END as effective_available
+      `SELECT im.*, COALESCE(im.available_qty, 0) as avail_qty
        FROM installation_materials im
-       LEFT JOIN material_order_items moi ON moi.id = im.order_item_id
        WHERE im.id = $1 AND im.work_id = $2`,
       [installation_material_id, workId]
     );
     if (matCheck.rows.length === 0) { res.status(404).json({ error: 'Материал не найден' }); return; }
     const mat = matCheck.rows[0];
-    const effectiveAvail = Number(mat.effective_available) || Number(mat.available_qty) || 0;
-    if (Number(mat.used_qty) + quantity > effectiveAvail) {
-      res.status(400).json({ error: `Использовано не может превысить поступление (${effectiveAvail})` }); return;
+    const avail = Number(mat.avail_qty) || 0;
+    // Если есть поступления — проверяем лимит, если нет — разрешаем (используется напрямую)
+    if (avail > 0 && Number(mat.used_qty) + quantity > avail) {
+      res.status(400).json({ error: `Использовано не может превысить поступление (${avail})` }); return;
     }
 
     // Обновляем used_qty
