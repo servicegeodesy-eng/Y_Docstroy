@@ -3,6 +3,7 @@ const PLANS = [
     key: "trial",
     name: "Пробный",
     price: "0",
+    trialDays: 30,
     objects: 1,
     users: 10,
     storage: "10 ГБ",
@@ -11,7 +12,7 @@ const PLANS = [
   {
     key: "start",
     name: "Старт",
-    price: "50 000",
+    price: "35 000",
     objects: 1,
     users: 30,
     storage: "50 ГБ",
@@ -20,7 +21,7 @@ const PLANS = [
   {
     key: "standard",
     name: "Стандарт",
-    price: "200 000",
+    price: "150 000",
     objects: 5,
     users: 150,
     storage: "500 ГБ",
@@ -29,7 +30,7 @@ const PLANS = [
   {
     key: "business",
     name: "Бизнес",
-    price: "300 000",
+    price: "250 000",
     objects: 10,
     users: 400,
     storage: "1 ТБ",
@@ -38,7 +39,7 @@ const PLANS = [
   {
     key: "corporation",
     name: "Корпорация",
-    price: "500 000",
+    price: "400 000",
     objects: 20,
     users: 1000,
     storage: "5 ТБ",
@@ -128,7 +129,12 @@ function PlanCard({
       </h3>
       <div className="mb-4">
         {plan.price === "0" ? (
-          <span className="text-2xl font-bold" style={{ color: "var(--ds-accent)" }}>Бесплатно</span>
+          <>
+            <span className="text-2xl font-bold" style={{ color: "var(--ds-accent)" }}>Бесплатно</span>
+            {"trialDays" in plan && (
+              <span className="text-sm ml-1" style={{ color: "var(--ds-text-muted)" }}>/ {plan.trialDays} дней</span>
+            )}
+          </>
         ) : (
           <>
             <span className="text-2xl font-bold" style={{ color: "var(--ds-accent)" }}>
