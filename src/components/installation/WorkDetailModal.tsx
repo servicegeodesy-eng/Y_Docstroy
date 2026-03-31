@@ -138,16 +138,20 @@ export default function WorkDetailModal({ workId, onClose, onUpdated }: Props) {
     if (qty <= 0) return;
     setDeliveryError(null);
     setActionLoading(true);
-    const res = await api.post(`/api/installation/works/${workId}/deliver-material`, { installation_material_id: matId, quantity: qty });
-    if (res.error) { setDeliveryError(res.error); setActionLoading(false); return; }
-    // Загрузка файлов поступления
-    for (const file of deliveryFiles) {
-      const fd = new FormData(); fd.append("file", file); fd.append("work_id", workId); fd.append("category", "delivery");
-      await api.upload("/api/installation/files", fd);
+    try {
+      const res = await api.post(`/api/installation/works/${workId}/deliver-material`, { installation_material_id: matId, quantity: qty });
+      if (res.error) { setDeliveryError(res.error); setActionLoading(false); return; }
+      for (const file of deliveryFiles) {
+        const fd = new FormData(); fd.append("file", file); fd.append("work_id", workId); fd.append("category", "delivery");
+        await api.upload("/api/installation/files", fd);
+      }
+      setDeliveryQty(""); setDeliveryFiles([]); setDeliveryMat(null);
+      loadWork(); onUpdated();
+    } catch (err) {
+      setDeliveryError("Ошибка при фиксации поступления");
+    } finally {
+      setActionLoading(false);
     }
-    setDeliveryQty(""); setDeliveryFiles([]); setDeliveryMat(null);
-    setActionLoading(false);
-    loadWork(); onUpdated();
   }
 
   // Фиксация процесса (использование)
@@ -156,19 +160,20 @@ export default function WorkDetailModal({ workId, onClose, onUpdated }: Props) {
     if (qty <= 0) return;
     setUsageError(null);
     setActionLoading(true);
-    const res = await api.post(`/api/installation/works/${workId}/use-material`, { installation_material_id: matId, quantity: qty });
-    if (res.error) {
-      setUsageError(res.error);
+    try {
+      const res = await api.post(`/api/installation/works/${workId}/use-material`, { installation_material_id: matId, quantity: qty });
+      if (res.error) { setUsageError(res.error); return; }
+      for (const file of usageFiles) {
+        const fd = new FormData(); fd.append("file", file); fd.append("work_id", workId); fd.append("category", "usage");
+        await api.upload("/api/installation/files", fd);
+      }
+      setUsageQty(""); setUsageFiles([]); setUsageMat(null);
+      loadWork(); onUpdated();
+    } catch (err) {
+      setUsageError("Ошибка при фиксации процесса");
+    } finally {
       setActionLoading(false);
-      return;
     }
-    for (const file of usageFiles) {
-      const fd = new FormData(); fd.append("file", file); fd.append("work_id", workId); fd.append("category", "usage");
-      await api.upload("/api/installation/files", fd);
-    }
-    setUsageQty(""); setUsageFiles([]); setUsageMat(null);
-    setActionLoading(false);
-    loadWork(); onUpdated();
   }
 
   // Подготовка завершения
