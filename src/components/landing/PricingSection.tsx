@@ -12,7 +12,7 @@ const PLANS = [
     key: "start",
     name: "Старт",
     price: "50 000",
-    objects: 2,
+    objects: 1,
     users: 30,
     storage: "50 ГБ",
     popular: false,
