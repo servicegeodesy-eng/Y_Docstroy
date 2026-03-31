@@ -12,7 +12,7 @@ const PLANS = [
   {
     key: "start",
     name: "Старт",
-    price: "35 000",
+    price: "40 000",
     objects: 1,
     users: 30,
     storage: "50 ГБ",
@@ -83,7 +83,7 @@ export default function PricingSection({ onSelectPlan }: Props) {
           </h3>
           <div className="flex flex-col sm:flex-row justify-center gap-4 sm:gap-8 text-sm" style={{ color: "var(--ds-text-muted)" }}>
             <span>+10 пользователей на объект — <b style={{ color: "var(--ds-text)" }}>10 000 руб/мес</b></span>
-            <span>+1 объект — <b style={{ color: "var(--ds-text)" }}>40 000 руб/мес</b></span>
+            <span>+1 объект — <b style={{ color: "var(--ds-text)" }}>35 000 руб/мес</b></span>
             <span>+50 ГБ хранилища — <b style={{ color: "var(--ds-text)" }}>10 000 руб/мес</b></span>
           </div>
         </div>
