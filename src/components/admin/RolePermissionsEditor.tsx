@@ -7,11 +7,23 @@ import type { PortalRolePermission } from "@/hooks/usePortalRolePermissions";
 /** Группы разрешений для визуальной организации */
 const PERMISSION_GROUPS: { group: string; cols: { key: PermissionKey; label: string; desc: string }[] }[] = [
   {
+    group: "Вкладки сайдбара",
+    cols: [
+      { key: "can_view_installation", label: "Монтаж", desc: "Отображение вкладки Монтаж в сайдбаре" },
+      { key: "can_view_materials", label: "Материалы", desc: "Отображение вкладки Материалы в сайдбаре" },
+      { key: "can_view_requests", label: "Заявки", desc: "Отображение вкладки Заявки в сайдбаре" },
+      { key: "can_view_registry", label: "Реестр", desc: "Отображение вкладки Реестр в сайдбаре" },
+      { key: "can_view_gro", label: "ГРО", desc: "Отображение вкладки ГРО в сайдбаре" },
+      { key: "can_view_fileshare", label: "Обмен файлами", desc: "Отображение вкладки Обмен файлами в сайдбаре" },
+      { key: "can_view_explorer", label: "Проводник", desc: "Отображение вкладки Проводник в сайдбаре" },
+      { key: "can_view_construction", label: "Процесс строительства", desc: "Отображение вкладки Процесс строительства в сайдбаре" },
+      { key: "can_view_admin", label: "Админ", desc: "Отображение вкладки Админ в сайдбаре" },
+    ],
+  },
+  {
     group: "Страница проекта",
     cols: [
       { key: "can_view_tasks", label: "Вкладка «Задачи»", desc: "Отображение вкладки Задачи и соответствующих инструкций" },
-      { key: "can_view_requests", label: "Вкладка «Заявки»", desc: "Отображение вкладки Заявки и соответствующих инструкций" },
-      { key: "can_view_admin", label: "Вкладка «Админ»", desc: "Отображение вкладки Админ и соответствующей инструкции" },
       { key: "can_print", label: "Печать", desc: "Отображение кнопки печати" },
     ],
   },

@@ -178,6 +178,14 @@ export interface UserPermission {
   can_view_requests: boolean;
   can_view_admin: boolean;
   can_print: boolean;
+  // Вкладки сайдбара
+  can_view_installation: boolean;
+  can_view_materials: boolean;
+  can_view_registry: boolean;
+  can_view_gro: boolean;
+  can_view_fileshare: boolean;
+  can_view_explorer: boolean;
+  can_view_construction: boolean;
   // Реестр — просмотр
   can_view_cell: boolean;
   can_view_files_block: boolean;
@@ -440,6 +448,8 @@ export const DEFAULT_STATUS_NAMES = [
 // Дефолтные разрешения по ролям (39 ключей)
 const ALL_FALSE_PERMS: Record<PermissionKey, boolean> = {
   can_view_tasks: false, can_view_requests: false, can_view_admin: false, can_print: false,
+  can_view_installation: false, can_view_materials: false, can_view_registry: false,
+  can_view_gro: false, can_view_fileshare: false, can_view_explorer: false, can_view_construction: false,
   can_view_cell: false, can_view_files_block: false, can_view_remarks_block: false,
   can_view_supervision_block: false, can_view_scan_block: false, can_view_process_block: false,
   can_view_comments_block: false, can_preview_files: false,
@@ -460,6 +470,8 @@ const VIEW_PERMS: Partial<Record<PermissionKey, boolean>> = {
   can_view_remarks_block: true, can_view_supervision_block: true, can_view_scan_block: true,
   can_view_process_block: true, can_view_comments_block: true,
   can_preview_files: true, can_download_files: true, can_print: true,
+  can_view_installation: true, can_view_materials: true, can_view_registry: true,
+  can_view_gro: true, can_view_fileshare: true, can_view_explorer: true, can_view_construction: true,
 };
 
 export const ROLE_DEFAULT_PERMISSIONS: Record<ProjectRoleType, Record<PermissionKey, boolean>> = {

@@ -184,18 +184,6 @@ const installationItem = {
   ),
 };
 
-const geodesyItem = {
-  path: "requests",
-  label: "Геодезия",
-  icon: (
-    <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <circle cx="12" cy="12" r="7" strokeWidth={1.5} />
-      <circle cx="12" cy="12" r="2" strokeWidth={1.5} />
-      <path strokeLinecap="round" strokeWidth={1.5} d="M12 2v5M12 17v5M2 12h5M17 12h5" />
-    </svg>
-  ),
-};
-
 const adminItem = {
   path: "admin",
   label: "Админ",
@@ -222,17 +210,11 @@ function Badge({ count }: { count?: number }) {
 export default function Sidebar({ isAdmin, mobileMode, onNavigate, badges }: SidebarProps) {
   const { projectId } = useParams();
   const { isPortalAdmin } = useAuth();
-  const { hasPermission, userRole } = useProject();
+  const { hasPermission } = useProject();
   const { theme, toggleTheme } = useTheme();
   const { canInstall, install } = usePwaInstall();
   const navigate = useNavigate();
-  const canViewRequests = hasPermission("can_view_requests");
   const geo = isGeoMode();
-  const isNativeWorkProducer = userRole === "Производитель работ";
-  // Админы могут переключать РМ
-  const canSwitchWorkspace = isAdmin || isPortalAdmin;
-  const [workspaceMode, setWorkspaceMode] = useState<"geodesy" | "production">(isNativeWorkProducer ? "production" : "geodesy");
-  const isWorkProducer = canSwitchWorkspace ? workspaceMode === "production" : isNativeWorkProducer;
   const [collapsed, setCollapsed] = useState(() => !mobileMode && localStorage.getItem(STORAGE_KEY) === "1");
   const [copied, setCopied] = useState(false);
 
@@ -336,108 +318,59 @@ export default function Sidebar({ isAdmin, mobileMode, onNavigate, badges }: Sid
       )}
 
       <nav className="flex-1 py-3 space-y-1 overflow-y-auto">
-        {/* Переключатель РМ для админов */}
-        {!geo && canSwitchWorkspace && !isCollapsed && (
-          <div className="px-2 pb-2 mb-1" style={{ borderBottom: "1px solid var(--ds-sidebar-border)" }}>
-            <div className="flex rounded-lg p-0.5" style={{ background: "rgba(255,255,255,0.08)" }}>
-              <button
-                onClick={() => { setWorkspaceMode("geodesy"); navigate(`/projects/${projectId}/registry`); }}
-                className="flex-1 px-2 py-1 text-xs font-medium rounded-md transition-colors"
-                style={workspaceMode === "geodesy"
-                  ? { background: "rgba(255,255,255,0.15)", color: "#fff" }
-                  : { color: "rgba(255,255,255,0.5)" }}
-              >
-                Геодезия
-              </button>
-              <button
-                onClick={() => { setWorkspaceMode("production"); navigate(`/projects/${projectId}/installation`); }}
-                className="flex-1 px-2 py-1 text-xs font-medium rounded-md transition-colors"
-                style={workspaceMode === "production"
-                  ? { background: "rgba(255,255,255,0.15)", color: "#fff" }
-                  : { color: "rgba(255,255,255,0.5)" }}
-              >
-                Производство
-              </button>
-            </div>
-          </div>
+        {/* Монтаж */}
+        {!geo && hasPermission("can_view_installation") && (
+          <NavLink to={`/projects/${projectId}/${installationItem.path}`} className={linkClass}
+            title={isCollapsed ? installationItem.label : undefined} onClick={handleLinkClick}>
+            {installationItem.icon}
+            {!isCollapsed && <span className="truncate">{installationItem.label}</span>}
+          </NavLink>
         )}
-        {!geo && canSwitchWorkspace && isCollapsed && (
-          <button
-            onClick={() => {
-              const next = workspaceMode === "geodesy" ? "production" : "geodesy";
-              setWorkspaceMode(next);
-              navigate(`/projects/${projectId}/${next === "geodesy" ? "registry" : "installation"}`);
-            }}
-            className="ds-nav-link justify-center mb-1"
-            title={workspaceMode === "geodesy" ? "Переключить на Производство" : "Переключить на Геодезию"}
-          >
-            <span className="text-[10px] font-bold" style={{ color: "rgba(255,255,255,0.7)" }}>
-              {workspaceMode === "geodesy" ? "ГЕО" : "ПР"}
+
+        {/* Материалы */}
+        {!geo && hasPermission("can_view_materials") && (
+          <NavLink to={`/projects/${projectId}/${materialsItem.path}`} className={linkClass}
+            title={isCollapsed ? materialsItem.label : undefined} onClick={handleLinkClick}>
+            {materialsItem.icon}
+            {!isCollapsed && <span className="truncate">{materialsItem.label}</span>}
+          </NavLink>
+        )}
+
+        {/* Заявки */}
+        {!geo && hasPermission("can_view_requests") && (
+          <NavLink to={`/projects/${projectId}/${requestItem.path}`} className={linkClass}
+            title={isCollapsed ? requestItem.label : undefined} onClick={handleLinkClick}>
+            <span className="relative shrink-0">
+              {requestItem.icon}
+              <Badge count={badges?.requests} />
             </span>
-          </button>
+            {!isCollapsed && <span className="truncate">{requestItem.label}</span>}
+          </NavLink>
         )}
 
-        {/* ═══ РМ Производителя работ (Прораба) ═══ */}
-        {!geo && isWorkProducer && (
-          <>
-            <NavLink to={`/projects/${projectId}/${installationItem.path}`} className={linkClass}
-              title={isCollapsed ? installationItem.label : undefined} onClick={handleLinkClick}>
-              {installationItem.icon}
-              {!isCollapsed && <span className="truncate">{installationItem.label}</span>}
-            </NavLink>
-
-            <NavLink to={`/projects/${projectId}/${materialsItem.path}`} className={linkClass}
-              title={isCollapsed ? materialsItem.label : undefined} onClick={handleLinkClick}>
-              {materialsItem.icon}
-              {!isCollapsed && <span className="truncate">{materialsItem.label}</span>}
-            </NavLink>
-
-            {canViewRequests && (
-              <NavLink to={`/projects/${projectId}/${geodesyItem.path}`} className={linkClass}
-                title={isCollapsed ? geodesyItem.label : undefined} onClick={handleLinkClick}>
-                <span className="relative shrink-0">
-                  {geodesyItem.icon}
-                  <Badge count={badges?.requests} />
-                </span>
-                {!isCollapsed && <span className="truncate">{geodesyItem.label}</span>}
-              </NavLink>
-            )}
-          </>
+        {/* Реестр */}
+        {!geo && hasPermission("can_view_registry") && (
+          <NavLink to={`/projects/${projectId}/${registryItem.path}`} className={linkClass}
+            title={isCollapsed ? registryItem.label : undefined} onClick={handleLinkClick}>
+            <span className="relative shrink-0">
+              {registryItem.icon}
+              <Badge count={badges?.registry} />
+            </span>
+            {!isCollapsed && <span className="truncate">{registryItem.label}</span>}
+          </NavLink>
         )}
 
-        {/* ═══ РМ Геодезиста (все остальные роли) ═══ */}
-        {!geo && !isWorkProducer && (
-          <>
-            <NavLink to={`/projects/${projectId}/${registryItem.path}`} className={linkClass}
-              title={isCollapsed ? registryItem.label : undefined} onClick={handleLinkClick}>
-              <span className="relative shrink-0">
-                {registryItem.icon}
-                <Badge count={badges?.registry} />
-              </span>
-              {!isCollapsed && <span className="truncate">{registryItem.label}</span>}
-            </NavLink>
-
-            {canViewRequests && (
-              <NavLink to={`/projects/${projectId}/${requestItem.path}`} className={linkClass}
-                title={isCollapsed ? requestItem.label : undefined} onClick={handleLinkClick}>
-                <span className="relative shrink-0">
-                  {requestItem.icon}
-                  <Badge count={badges?.requests} />
-                </span>
-                {!isCollapsed && <span className="truncate">{requestItem.label}</span>}
-              </NavLink>
-            )}
-
-            <NavLink to={`/projects/${projectId}/${groItem.path}`} className={linkClass}
-              title={isCollapsed ? groItem.label : undefined} onClick={handleLinkClick}>
-              {groItem.icon}
-              {!isCollapsed && <span className="truncate">{groItem.label}</span>}
-            </NavLink>
-          </>
+        {/* ГРО */}
+        {!geo && hasPermission("can_view_gro") && (
+          <NavLink to={`/projects/${projectId}/${groItem.path}`} className={linkClass}
+            title={isCollapsed ? groItem.label : undefined} onClick={handleLinkClick}>
+            {groItem.icon}
+            {!isCollapsed && <span className="truncate">{groItem.label}</span>}
+          </NavLink>
         )}
 
-        {/* ═══ Общие вкладки (оба РМ) ═══ */}
-        {!geo && (
+        {/* Обмен файлами */}
+        {!geo && hasPermission("can_view_fileshare") && (
           <NavLink to={`/projects/${projectId}/${fileshareItem.path}`} className={linkClass}
             title={isCollapsed ? fileshareItem.label : undefined} onClick={handleLinkClick}>
             <span className="relative shrink-0">
@@ -448,7 +381,8 @@ export default function Sidebar({ isAdmin, mobileMode, onNavigate, badges }: Sid
           </NavLink>
         )}
 
-        {!geo && (
+        {/* Проводник */}
+        {!geo && hasPermission("can_view_explorer") && (
           <NavLink to={`/projects/${projectId}/${explorerItem.path}`} className={linkClass}
             title={isCollapsed ? explorerItem.label : undefined} onClick={handleLinkClick}>
             {explorerItem.icon}
@@ -458,8 +392,8 @@ export default function Sidebar({ isAdmin, mobileMode, onNavigate, badges }: Sid
 
         {!geo && <div className="ds-divider" />}
 
-        {/* Процесс строительства (карта-изображение) */}
-        {!geo && (
+        {/* Процесс строительства */}
+        {!geo && hasPermission("can_view_construction") && (
           <NavLink
             to={`/projects/${projectId}/${constructionItem.path}`}
             className={linkClass}
@@ -471,7 +405,7 @@ export default function Sidebar({ isAdmin, mobileMode, onNavigate, badges }: Sid
           </NavLink>
         )}
 
-        {!geo && isAdmin && (
+        {!geo && isAdmin && hasPermission("can_view_admin") && (
           <>
             <div className="ds-divider" />
             <NavLink

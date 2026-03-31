@@ -11,6 +11,14 @@ export interface PortalRolePermission {
   can_view_requests: boolean;
   can_view_admin: boolean;
   can_print: boolean;
+  // Вкладки сайдбара
+  can_view_installation: boolean;
+  can_view_materials: boolean;
+  can_view_registry: boolean;
+  can_view_gro: boolean;
+  can_view_fileshare: boolean;
+  can_view_explorer: boolean;
+  can_view_construction: boolean;
   // Реестр — просмотр
   can_view_cell: boolean;
   can_view_files_block: boolean;
